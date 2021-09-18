@@ -13,6 +13,8 @@
   - if we have accurate vanishing points, we can get the focal length
   - we need accurate parallel lines to estimate the vanishing point, so need
     some way to find those
+    so maybe impossible for our project (where the only dependable straight lines are probably the pyramids)
+    
 ** Hough Transform
    http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/HoughTrans_lines_09.pdf
    - Detects probably straight lines
@@ -24,10 +26,29 @@
     - map points to hough transform (additive)
     - find possible centers corresponding to valid lines
     - assuming lines fit into perpendicular groups, valid vanishing points should be at the intersection of some of these lines
-    - (alt) find vanishing points directly by fitting sign curves
+    - (alt) find vanishing points directly by fitting sine curves to hough transform
+      - https://link.springer.com/content/pdf/10.1007/3-540-48311-X_137.pdf
+*** caveats
+  - NOT ALL SCENES HAVE APPROPRIATE STRUCTURE FOR THE DETECTION OF ORTHOGONAL VANISHING POINTS
+
+** Motion vectors
+   http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&zoom=100,130,908
+
+   - Even if our scene might lack good target lines, we have 2 cameras
+   - In the paper, motion vectors can be drawn between consecutive frames where
+     a car moves relative to the camera
+   - In our case, the entire scene has moved relative to the camera
+*** algortithm
+    - extract good features from both camera frames
+    - (maybe need to align the rotation of the 2 frames using the features)
+    - map the features from each frame to produce "motion" lines
+    - use the lines/vectors to find vanishing point(s)
+*** caveats
+   - THIS DOES ASSUME BOTH CAMERAS HAVE THE SAME FOCAL LENGTH
 
 * Focal Length from Vanishing Points
-  https://stackoverflow.com/questions/53873082/focal-length-computation-from-vanishing-points
+  - https://stackoverflow.com/questions/53873082/focal-length-computation-from-vanishing-points
+  - http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&zoom=100,130,908
 
 #+begin_example
   f = sqrt(-(U - P) * (V - P))
@@ -35,3 +56,11 @@
   - f: focal length
   - P: principal point in image space (probably the center, assuming the image is unedited)
   - U, V: vanishing points in image space
+
+* TODO extra sources
+** http://www.fit.vutbr.cz/research/groups/graph/pclines/papers/2013-BMVC-Dubska-VanishingPointsDetection.pdf
+   Diamond space ???
+** https://ieeexplore.ieee.org/document/5456535
+** https://ieeexplore.ieee.org/document/6671929
+** https://dl.acm.org/doi/10.1145/3402597.3402602
+   Not sure if I can get access to this one
