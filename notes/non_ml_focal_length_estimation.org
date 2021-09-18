@@ -1,0 +1,37 @@
+#+TITLE: Estimating focal length with only CV
+
+* fSpy
+  https://github.com/stuffmatic/fSpy
+  
+  Attempts to find vanishing points and focal length based on user inputted
+  perpendicular lines in the image, but doesn't do the best job for almost parallel lines.
+  Can we achieve better accuracy if we cut user input of perpendicular lines?
+
+* Vanishing Points
+  https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar.pdf
+  
+  - if we have accurate vanishing points, we can get the focal length
+  - we need accurate parallel lines to estimate the vanishing point, so need
+    some way to find those
+** Hough Transform
+   http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/HoughTrans_lines_09.pdf
+   - Detects probably straight lines
+   - Doesn't necessarily find probably parallel lines, but I guess we can do some
+     clustering
+   - Maybe ML solution to finding good lines in our image
+*** algorithm
+    - sobel or canny to find edge points
+    - map points to hough transform (additive)
+    - find possible centers corresponding to valid lines
+    - assuming lines fit into perpendicular groups, valid vanishing points should be at the intersection of some of these lines
+    - (alt) find vanishing points directly by fitting sign curves
+
+* Focal Length from Vanishing Points
+  https://stackoverflow.com/questions/53873082/focal-length-computation-from-vanishing-points
+
+#+begin_example
+  f = sqrt(-(U - P) * (V - P))
+#+end_example
+  - f: focal length
+  - P: principal point in image space (probably the center, assuming the image is unedited)
+  - U, V: vanishing points in image space
