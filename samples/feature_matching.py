@@ -1,6 +1,5 @@
 import cv2 as cv
 import numpy as np
-from matplotlib import pyplot as plt
 import math
 
 class ImageWithMatches:
@@ -50,7 +49,7 @@ def match_features(des_left, des_right):
     # Sort them in the order of their distance (between feature vectors, not points).
     return sorted(good, key = lambda x:x.distance)
 
-# Grab both stereograms, scale them down to fit in 1000x1000
+# grab both stereograms, scale them down to fit in 1000x1000
 left = ImageWithMatches(cv.imread('../../data/left.tif'), 1000)
 right = ImageWithMatches(cv.imread('../../data/right.tif'), 1000)
 
@@ -70,10 +69,25 @@ print('ORB + Brute Force Matcher, Matches:', len(matches))
 
 # Get the corresponding points from each match
 to_draw = [pts_from_match(match, left.kp, right.kp) for match in matches]
+
+def remove_outliers(pts):
+    pts = sorted(pts, key = lambda x: length(*x))
+    n = len(pts)
+
+    q = [length(*pts[i]) for i in [(n * x) // 4 for x in range(4)]]
+    iqr = q[3] - q[1]
+
+    def good(x):
+       dist = length(*x)
+       return dist >= q[1] - 1.5 * iqr and dist <= q[3] + 1.5 * iqr
+
+    return [x for x in pts if good(x)]
+
+to_draw = remove_outliers(to_draw)
 n = len(to_draw)
 
 # Get a reasonable magnitude to use to normalize colors
-norm_dx = sorted([abs(u[0] - v[0]) for u, v in to_draw])[int(n * .98)]
+norm_dx = sorted([abs(u[0] - v[0]) for u, v in to_draw])[-1]
 
 # Sanity check to ensure the images aren't shifted vertically
 mean_dy = sum([v[1] - u[1] for u, v in to_draw]) / n
@@ -83,11 +97,9 @@ print('norm dx:', norm_dx)
 print('mean dy:', mean_dy)
 print('stddev dy:', variance_dy ** 0.5)
 
-# Draw's the linear interpolation of the left and right features with weight, z
+# Draws the linear interpolation of the left and right features with weight, z in [0.0, 1.0]
 def draw_frame(frame, z, sample_colors = None):
     for u,v in to_draw:
-        zz = z
-
         color = (0, 255, 0)
         if sample_colors:
             color = lerp(sample_colors[0][u[1]][u[0]],
@@ -96,12 +108,7 @@ def draw_frame(frame, z, sample_colors = None):
         else:
             color = lerp((255, 0, 0), (0, 0, 255), sigmoid((u[0] - v[0]) / norm_dx))
 
-        if abs(u[0] - v[0]) > norm_dx:
-            zz = 1
-            if not sample_colors:
-                color = (0, 255, 0)
-
-        cv.circle(frame, np.int0(lerp(u, v, zz)), 2, color, -1)
+        cv.circle(frame, np.int0(lerp(u, v, z)), 2, color, -1)
 
 example = left.img.copy()
 draw_frame(example, 1)
