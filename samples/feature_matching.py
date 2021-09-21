@@ -4,8 +4,8 @@ import math
 
 class ImageWithMatches:
     def __init__(self, img, target_size):
-        scale = max(img.shape[0] // target_size, img.shape[1] // target_size)
-        shape = (img.shape[0] // scale, img.shape[1] // scale)
+        scale = max(img.shape[0] / target_size, img.shape[1] / target_size)
+        shape = np.int0([img.shape[1] / scale, img.shape[0] / scale])
         self.img = cv.resize(img, shape)
 
     def shift(self, tx, ty):
@@ -13,7 +13,7 @@ class ImageWithMatches:
             [1, 0, tx],
             [0, 1, ty]
         ], dtype=np.float32)
-        self.img = cv.warpAffine(self.img, mat, self.img.shape[:2])
+        self.img = cv.warpAffine(self.img, mat, (self.img.shape[1], self.img.shape[0]))
 
 
     def find_features(self):
@@ -49,6 +49,19 @@ def match_features(des_left, des_right):
     # Sort them in the order of their distance (between feature vectors, not points).
     return sorted(good, key = lambda x:x.distance)
 
+def remove_match_outliers(pts):
+    pts = sorted(pts, key = lambda x: length(*x))
+    n = len(pts)
+
+    q = [length(*pts[i]) for i in [(n * x) // 4 for x in range(4)]]
+    iqr = q[3] - q[1]
+
+    def good(x):
+       dist = length(*x)
+       return dist >= q[1] - 1.5 * iqr and dist <= q[3] + 1.5 * iqr
+
+    return [x for x in pts if good(x)]
+
 # grab both stereograms, scale them down to fit in 1000x1000
 left = ImageWithMatches(cv.imread('../../data/left.tif'), 1000)
 right = ImageWithMatches(cv.imread('../../data/right.tif'), 1000)
@@ -69,22 +82,9 @@ print('ORB + Brute Force Matcher, Matches:', len(matches))
 
 # Get the corresponding points from each match
 to_draw = [pts_from_match(match, left.kp, right.kp) for match in matches]
-
-def remove_outliers(pts):
-    pts = sorted(pts, key = lambda x: length(*x))
-    n = len(pts)
-
-    q = [length(*pts[i]) for i in [(n * x) // 4 for x in range(4)]]
-    iqr = q[3] - q[1]
-
-    def good(x):
-       dist = length(*x)
-       return dist >= q[1] - 1.5 * iqr and dist <= q[3] + 1.5 * iqr
-
-    return [x for x in pts if good(x)]
-
-to_draw = remove_outliers(to_draw)
+to_draw = remove_match_outliers(to_draw)
 n = len(to_draw)
+print('Removed outliers:', len(matches) - n)
 
 # Get a reasonable magnitude to use to normalize colors
 norm_dx = sorted([abs(u[0] - v[0]) for u, v in to_draw])[-1]
@@ -121,9 +121,10 @@ fps = 24
 seconds = 2
 fourcc = cv.VideoWriter_fourcc(*'MP42')
 video = cv.VideoWriter(video_path, fourcc, fps, (left.img.shape[1], left.img.shape[0]), True)
+right_scaled = cv.resize(right.img, (left.img.shape[1], left.img.shape[0]))
 for i in range(fps * seconds):
-    frame = np.zeros(left.img.shape, dtype=np.uint8)
     z = (math.sin(i * math.pi / fps / seconds) + 1) / 2
+    frame = np.add(np.multiply(left.img, z), np.multiply(right_scaled, 1 - z)).astype(np.uint8) # np.zeros(left.img.shape, dtype=np.uint8)
     draw_frame(frame, z)
     video.write(frame)
 video.release()
