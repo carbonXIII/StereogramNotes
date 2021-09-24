@@ -1,0 +1,4 @@
+* TODO extra sources
+** https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf
+** https://blog.pollithy.com/vision/epipolar-geometry
+** https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar
