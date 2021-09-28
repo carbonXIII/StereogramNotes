@@ -4,161 +4,237 @@ import numpy as np
 import random
 import math
 
-def svd(mat):
-    b = mat[:, 0].copy()
-    ret = np.linalg.lstsq(mat[:, 1:], -b, rcond=None)[0]
-    return np.r_[1, ret]
+def h2e(X):
+    return (X / X[-1])[:-1]
 
-def eight_point(matches):
-    A = [];
-    for match in matches:
-        u,v = match
-        A.append([u[0]*v[0],
-                  u[0]*v[1],
-                  u[0],
-                  u[1]*v[0],
-                  u[1]*v[1],
-                  u[1],
-                  v[0],
-                  v[1],
-                  1])
+def rectify_shearing(H1, image_width, image_height):
 
-    A = np.array(A)
-    F_ = svd(A).reshape((3, 3))
+	##### ##### ##### ##### ##### 
+	##### CREDIT
+	##### ##### ##### ##### ##### 
 
-    u, s, v = np.linalg.svd(F_)
+	# Loop & Zhang - via literature
+	#	* http://scicomp.stackexchange.com/questions/2844/shearing-and-hartleys-rectification
+	# TH. - via stackexchange user
+	# 	* http://scicomp.stackexchange.com/users/599/th
+	#	* http://scicomp.stackexchange.com/questions/2844/shearing-and-hartleys-rectification
 
-    s[-1] = 0
-    s_mat = np.zeros((3, 3))
-    np.fill_diagonal(s_mat, s)
+	##### ##### ##### ##### ##### 
+	##### PARAMETERS
+	##### ##### ##### ##### ##### 
 
-    return np.matmul(u, np.matmul(s_mat, v))
+	# Let H1 be the rectification homography of image1 (ie. H1 is a homogeneous space)
+	# Let H2 be the rectification homography of image2 (ie. H2 is a homogeneous space)
+	# image_width, image_height be the dimensions of both image1 and image2
 
-def line_point_dist(line, point):
-    return np.dot(point, line) / math.hypot(line[0], line[1])
+	##### ##### ##### ##### ##### 
 
-def eight_point_ransac(matches, batch_size = 32, iterations = 200, threshold = 5):
-    batch_size = min(len(matches) / 2, batch_size)
+	"""
+	Compute shearing transform than can be applied after the rectification transform to reduce distortion.
+	Reference:
+		http://scicomp.stackexchange.com/questions/2844/shearing-and-hartleys-rectification
+		"Computing rectifying homographies for stereo vision" by Loop & Zhang
+	"""
 
-    best = None
-    for _ in range(iterations):
-        reps = random.choices(matches, k = batch_size)
-        cand = eight_point(reps)
+	w = image_width
+	h = image_height
 
-        k = 0
-        for u, v in matches:
-            U = np.r_[u, 1]
-            V = np.r_[v, 1]
-            dist = abs(line_point_dist(np.matmul(cand, U), V))
-            if dist < threshold:
-                k += 1
+	'''
+	Loop & Zhang use a shearing transform to reduce the distortion
+	introduced by the projective transform that mapped the epipoles to infinity
+	(ie, that made the epipolar lines parallel).
+	Consider the shearing transform:
+			| k1 k2 0 |
+	S	=	| 0  1  0 |
+			| 0  0  1 |
+	Let w and h be image width and height respectively.
+	Consider the four midpoints of the image edges:
+	'''
 
-        if not best or best[1] < k:
-            best = (cand, k)
+	a = np.float32([ (w-1)/2.0,	0,			1 ])
+	b = np.float32([ (w-1),		(h-1)/2.0,	1 ])
+	c = np.float32([ (w-1)/2.0,	(h-1),		1 ])
+	d = np.float32([ 0,			(h-1)/2.0,	1 ])
 
-    return best
+	'''
+	According to Loop & Zhang:
+	"... we attempt to preserve perpendicularity and aspect ratio of the lines bd and ca"
+	'''
 
-def find_inliers(matches, F, threshold = 5):
-    ret = []
-    for u, v in matches:
-        U = np.r_[u, 1]
-        V = np.r_[v, 1]
-        dist = abs(line_point_dist(np.matmul(F, U), V))
-        if dist < threshold:
-            ret += [(u, v)]
+	'''
+	Let H be the rectification homography and,
+	Let a' = H*a be a point in the affine plane by dividing through so that a'2 = 1
+	Note: a'2 is the third component, ie, a' = (a'[0], a'1, a'2))
+	'''
+
+	# Note: *.dot is a form of matrix*vector multiplication in numpy
+	# So a_prime = H*a such that a_prime[2] = 1 (hence the use of h2e function)
+
+	a_prime = h2e(np.matmul(H1, a.transpose()))
+	b_prime = h2e(np.matmul(H1, b.transpose()))
+	c_prime = h2e(np.matmul(H1, c.transpose()))
+	d_prime = h2e(np.matmul(H1, d.transpose()))
+
+	''' Let x = b' - d' and y = c' - a' '''
+
+	x = b_prime - d_prime
+	y = c_prime - a_prime
+
+	'''
+	According to Loop & Zhang:
+		"As the difference of affine points, x and y are vectors in the euclidean image plane.
+			Perpendicularity is preserved when (Sx)^T(Sy) = 0, and aspect ratio is preserved if [(Sx)^T(Sx)]/[(Sy)^T(Sy)] = (w^2)/(h^2)"
+	'''
+
+	''' The real solution presents a closed-form: '''
+
+	k1 = (h*h*x[1]*x[1] + w*w*y[1]*y[1]) / (h*w*(x[1]*y[0] - x[0]*y[1]))
+	k2 = (h*h*x[0]*x[1] + w*w*y[0]*y[1]) / (h*w*(x[0]*y[1] - x[1]*y[0]))
+
+	''' Determined by sign (the positive is preferred) '''
+
+	if (k1 < 0): # Why this?
+		k1 *= -1
+		k2 *= -1
+
+	return np.float32([
+		[k1,	k2,	0],
+		[0,		1,	0],
+		[0,		0,	1]])
+
+def disparity_uncalibrated(left, right, verbose = False):
+    matches = np.array(left.match(right))
+
+    x1 = matches[:, 0]
+    x2 = matches[:, 1]
+
+    F, F_mask = cv.findFundamentalMat(x1, x2, method=cv.FM_LMEDS)
+    F_mask = F_mask.flatten()
+    x1 = x1[F_mask == 1]
+    x2 = x2[F_mask == 1]
+
+    if verbose:
+        print('F:', F)
+        print('Inlier points:', len(x1))
+
+    ret, h1, h2 = cv.stereoRectifyUncalibrated(x1, x2, F, (left.img.shape[1], left.img.shape[0]), threshold = 0)
+    if not ret:
+        print('Failed to rectify')
+        return None
+
+    s1 = rectify_shearing(h1, left.img.shape[1], left.img.shape[0]) 
+    s2 = rectify_shearing(h2, right.img.shape[1], right.img.shape[0]) 
+    h1 = np.matmul(s1, h1)
+    h2 = np.matmul(s2, h2)
+
+    n = len(x1)
+    x1_ = np.vstack((x1.transpose(), np.ones(n)))
+
+    h, w = left.img.shape
+    x1_ = [[0, 0, 1],
+           [w, 0, 1],
+           [0, h, 1],
+           [w, h, 1]]
+    x1_ = np.transpose(x1_)
+
+    x1_ = np.matmul(h1, x1_)
+    x1_[0] /= x1_[-1]
+    x1_[1] /= x1_[-1]
+    lx = x1_[0].min()
+    ly = x1_[1].min()
+    hx = x1_[0].max()
+    hy = x1_[1].max()
+
+    T = [[1, 0, -lx],
+         [0, 1, -ly],
+         [0, 0, 1]]
+
+    sx = 1000 / (hx - lx)
+    sy = 1000 / (hy - ly)
+    S = [[sx, 0, 0],
+         [0, sy, 0],
+         [0, 0, 1]]
+
+    h1 = np.matmul(np.matmul(S, T), h1)
+    h2 = np.matmul(np.matmul(S, T), h2)
+
+    left_w = left.img.copy()
+    left_w = cv.warpPerspective(left_w, h1, (1000, 1000))
+
+    right_w = right.img.copy()
+    right_w = cv.warpPerspective(right_w, h2, (1000, 1000))
+
+    frame = None
+    if verbose:
+        z = .5
+        frame = np.add(np.multiply(left_w, z), np.multiply(right_w, 1 - z)).astype(np.uint8)
+        frame = cv.cvtColor(frame, cv.COLOR_GRAY2BGR)
+
+    x1_ = np.vstack((x1.transpose(), np.ones(n)))
+    x1_ = np.matmul(h1, x1_)
+
+    x2_ = np.vstack((x2.transpose(), np.ones(n)))
+    x2_ = np.matmul(h2, x2_)
+
+    dxs = []
+    for i in range(len(x1_[0])):
+        u = np.int0(h2e(x1_[:, i]))
+        v = np.int0(h2e(x2_[:, i]))
+
+        dx = u[0] - v[0]
+        dxs += [dx]
+
+        if verbose:
+            cv.line(frame, u, v, (255, 0, 0), 2)
+
+    if verbose:
+        cv.imshow('warped', frame)
+
+    win_size = 1
+    min_disp = min(dxs)
+    max_disp = max(dxs) #min_disp * 9
+    num_disp = max_disp - min_disp # Needs to be divisible by 16
+    num_disp = ((max_disp + 15) // 16) * 16
+    #Create Block matching object. 
+    stereo = cv.StereoSGBM_create(minDisparity= min_disp,
+                                   numDisparities = num_disp,
+                                   blockSize = 1,
+                                   uniquenessRatio = 5,
+                                   speckleWindowSize = 5,
+                                   speckleRange = 5,
+                                   disp12MaxDiff = 0,
+                                   P1 = 8*3*win_size**2,#8*3*win_size**2,
+                                   P2 =32*3*win_size**2) #32*3*win_size**2)
+
+    disparity = stereo.compute(left_w, right_w)
+
+    right_stereo = cv.ximgproc.createRightMatcher(stereo)
+    right_disparity = right_stereo.compute(right_w, left_w)
+
+    wls_filter = cv.ximgproc.createDisparityWLSFilter(stereo)
+    wls_filter.setLambda(8000)
+    wls_filter.setSigmaColor(1.5)
+
+    filtered_disparity = wls_filter.filter(disparity, left_w, disparity_map_right=right_disparity)
+
+    h1i = np.linalg.inv(h1)
+    ret = cv.warpPerspective(filtered_disparity, h1i, (left.img.shape[1], left.img.shape[0]))
     return ret
 
-def find_epipoles(matches, F):
-    A = []
-    B = []
-    for u, v in matches:
-        U = np.r_[u, 1]
-        V = np.r_[v, 1]
-        A.append(np.matmul(F, U))
-        B.append(np.matmul(F.transpose(), V))
-
-    A = np.array(A)
-    B = np.array(B)
-
-    return svd(A), svd(B)
-
-def find_rectification_homographies(matches, F, right_shape, f):
-    el, er = find_epipoles(matches, F)
-
-    h, w = right_shape[:2]
-    T = [[1,0,-w/2],
-         [0, 1,-h/2],
-         [0, 0, 1]]
-
-    er = np.matmul(T, er)
-    er /= er[-1]
-    magr = math.hypot(er[0], er[1])
-
-    print(er)
-
-    alpha = -1 if er[0] < 0 else 1
-
-    R = [[ alpha * er[0] / magr, alpha * er[1] / magr, 0],
-         [-alpha * er[1] / magr, alpha * er[0] / magr, 0],
-         [0, 0, 1]]
-
-    G = [[1, 0, 0],
-         [0, 1, 0],
-         [-1/f, 0, 1]]
-
-    Hr = np.matmul(np.linalg.inv(T), np.matmul(G, np.matmul(R, T)))
-
-    return None, Hr
-
-def main():
-    left = ImageWithFeatures(cv.imread('../../data/left.tif'), 1000, 0, -5.87105309784089)
-    right = ImageWithFeatures(cv.imread('../../data/right.tif'), 1000)
-
-    matches = left.match(right)
-    matches = remove_match_outliers(matches)
-    print('Initial Matches:', len(matches))
-
-    F, k = eight_point_ransac(matches)
-    print(F, k)
-
-    matches = find_inliers(matches, F)
-    print('Inlier Matches:', len(matches))
-
-    def draw_frame():
-        frame = left.img.copy()
-        def __lerp(a, b, x):
-            return np.add(np.multiply(a, x), np.multiply(b, 1 - x))
-
-        def __sigmoid(x):
-            return 1 / (1 + math.exp(-x))
-
-        norm_dx = sorted([abs(u[0] - v[0]) for u, v in matches])[-1]
-        for u,v in matches:
-            color = (0, 255, 0)
-            color = __lerp((255, 0, 0), (0, 0, 255), __sigmoid((u[0] - v[0]) / norm_dx))
-
-            l = np.matmul(F, np.r_[u, 1])
-            s = (0, -l[2] / l[1])
-            t = (frame.shape[1], (-l[0] * frame.shape[1] - l[2]) / l[1])
-            cv.line(frame, u, v, color, 2)
-            # cv.line(frame, np.int0(s), np.int0(t), color, 2)
-            #cv.circle(frame, u, 5, (255, 0, 0), -1)
-            # cv.circle(frame, v, 5, (0, 0, 255), -1)
-
-        cv.imshow('epipolar lines', frame)
-        cv.waitKey(0)
-
-    draw_frame()
-
-    hl, hr = find_rectification_homographies(matches,
-                                             F,
-                                             right.img.shape,
-                                             500)
-
-    frame = right.img.copy()
-    frame = cv.warpPerspective(frame, hr, (1000, 1000))
-    cv.imshow('warped', frame)
-    cv.waitKey(0)
-
 if __name__ == '__main__':
-    main()
+    # Still no good way to find ty besides manual tuning,
+    # but it is very important to get it right to avoid distortion during rectification
+    # 3.5 pixels seems OK
+    left = ImageWithFeatures(cv.imread('../../data/left.tif', cv.IMREAD_GRAYSCALE), 1000, 0, -3.5) 
+    right = ImageWithFeatures(cv.imread('../../data/right.tif', cv.IMREAD_GRAYSCALE), 1000)
+
+    disparity = disparity_uncalibrated(left, right)
+    disparity = np.ones(disparity.shape) / disparity * 50000
+
+    disparity = disparity.clip(None, 255)
+
+    # disparity = cv.normalize(disparity, disparity, alpha=255, beta=0, norm_type=cv.NORM_MINMAX)
+    disparity = np.uint8(disparity)
+
+    cv.imshow('disparity', disparity)
+    cv.waitKey(0)

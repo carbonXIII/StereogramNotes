@@ -75,6 +75,9 @@ def main():
                              -5.87105309784089) # specifying y translation manually for this smaple
     right = ImageWithFeatures(cv.imread('../../data/right.tif'), 1000)
 
+    left = ImageWithFeatures(cv.imread('../../data/tree_left.png'), 1000, -25, -16)
+    right = ImageWithFeatures(cv.imread('../../data/tree_right.png'), 1000)
+
     print('Left Image Feature Count:', len(left.kp))
 
     # Match the features using Brute Force Matching
@@ -91,11 +94,19 @@ def main():
     # Get a reasonable magnitude to use to normalize colors
     norm_dx = sorted([abs(u[0] - v[0]) for u, v in to_draw])[-1]
 
+    min_dx, max_dx = (0, 0)
+    if True:
+        a = sorted([u[0] - v[0] for u, v in to_draw])
+        min_dx = a[0]
+        max_dx = a[-1]
+
     # Sanity check to ensure the images aren't shifted vertically
     mean_dy = sum([v[1] - u[1] for u, v in to_draw]) / n
     variance_dy = sum([(v[1] - u[1] - mean_dy) ** 2 for u, v in to_draw]) / n
 
     print('norm dx:', norm_dx)
+    print('min dx:', min_dx)
+    print('max dx:', max_dx)
     print('mean dy:', mean_dy)
     print('stddev dy:', variance_dy ** 0.5)
 

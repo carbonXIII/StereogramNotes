@@ -2,3 +2,6 @@
 ** https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf
 ** https://blog.pollithy.com/vision/epipolar-geometry
 ** https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar
+** https://engineering.purdue.edu/kak/Tutorials/StereoRectification.pdf
+** https://github.com/eddiecorrigall/Vision/blob/master/Stereo/rectify.py
+** https://stackoverflow.com/questions/36172913/opencv-depth-map-from-uncalibrated-stereo-system
