@@ -1,4 +1,5 @@
 #+TITLE: Estimating focal length with only CV
+#+LATEX_HEADER: \usepackage[margin=0.5in]{geometry}
 #+OPTIONS: toc:nil
 
 * fSpy
