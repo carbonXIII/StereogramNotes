@@ -1,49 +1,105 @@
-* Homogenous Coordinates
-  https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf
-
-** normalization
-  - Points of the form <x, y, 1> when normalized.
-  - We can recover our 2d image coordinates (x, y) from any homogenous vector by
-    dividing by the third parameter: <x, y, z> -> <x/z, y/z, 0>
-
-** points at infinity
-   - <x, y, 0> is a point at infinity in the direction of (x,y)
-
-** lines
-   - Lines described using vectors <a, b, c>, where
-     + -a/b is the slope
-     + -c/b is the y intercept
-   - A point, p, is on a line, l, when p \dot l = 0
-   - The intersection of 2 lines, \alpha and \beta is \alpha \times \beta
-     + the intersection of parallel lines is a point at infinity in the direction of the lines <b, -a, 0>
-
-** transformations
-  - Matrices on homogeneous coordinates are useful for describing transformations
-  - Can map between normal points and points and infinity
-
-** 3D
-   - Follows from 2D:
-     + Point <x, y, z, 1>
-     + Plane <a, b, c, d>, Point on Plane \dot Plane = 0
-   - Projection mapping, H: mapping from 3d point to camera space
-
-** Vanishing points and vanishing lines
-   - Vanishing point: given a 3d direction <a, b, c> we can apply the camera intrinsic matrix K to get a point in image space
-     + Importantly we can a
-   - Given a coplanar set of pairs of parallel lines, we can find the intersection point for each pair (a set of points and infinity) and this set of points will be co-linear on a line at infinity
-     + Applying our projective transformation to this line at infinity, we get a vanishing line or horizon line
-     + The normal vector for our plane can be computed directly using this vanishing line and K
-   - We can use these relationships to calculate the angles between vectors or planes in our image:
-     + vanishing points -> 3D vectors -> angle
-     + vanishing lines -> normal of 3D planes -> angle
-     + with 3 vanishing points from 3 independent planes, we can use this relationship to solve for K
+#+TITLE: Epipolar Geometry
+#+LATEX_HEADER: \usepackage[margin=0.5in]{geometry}
 
 * Fundamental Matrix
-** https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf
+  https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf
+
+** typical epipolar camera setup
+   - baseline: the line between the camera centers
+   - epipole: the intersection of the baseline and the respective camera plane
+     + this is a point at infinity if the cameras are parallel
+*** for some 3D point, P, in both cameras' image space
+    - epipolar plane: the plane formed by the camera centers and P
+    - epipolar line: the intersection of the epipolar plane and the respective camera plane
+      + for any choice of P, the epipolar line will contain the epipole (given the definition of epipolar plane)
+** essential matrix
+   - if we have some point p in one image, and want to find it's match p' in
+     the other image, we know that it must lie on the corresponding epipolar line for P
+   - to find the epipolar line we must know the relative position of our cameras (rotation and translation)
+   - Assuming we have 2 canonical cameras (cameras with focal length of 1, so K = K' = I):
+     + their projection matrices will be M = [I 0] and M' = [R^T  -R^T \cdot T]
+     + for some point, p' on camera 2's image plane, we know that it maps to Rp' + T on camera 1's image plane
+     + Since T and (Rp' + T) are on the epipolar plane for P, T \times (Rp' + T) = T \times Rp' is the normal of the plane
+     + Since p is on the epipolar plane as well, $p^T \cdot (T \times Rp') = 0$
+     + Rewriting T \times Rp' as T_{\times} \cdot Rp', p^T \cdot [T_{\times}]R \cdot p' = 0
+     + our essential matrix, E = [T_{\times}]R, so pEp' = 0
+** fundamental matrix
+   - we assumed the camera's were canonical to get the essential matrix, so we can factor K back into the equation:
+     + p^T \cdot K^{-T} \cdot E \cdot K'^{-1} \cdot p' = 0
+     + fundamental matrix, F = K^{-T} \cdot E \cdot K'^{-1} = K^{-T} \cdot T_{\times} \cdot R \cdot K'^{-1}
+*** properties:
+    - p^T \cdot F: epipolar line in our first image
+    - F \cdot p': epipolar line in our second image
+    - scale for lines doesn't matter, so F has only 8 DOF
+    - F maps points to lines so it should only have rank 2
+*** estimation, 8-point algo:
+    - without knowing any of our camera parameters (K, K', T, R) if we have enough independent epipolar lines,
+      we should be able to solve for F
+    - given 2 matching points in our images, p = (u, v, 1) and p' = (u', v', 1):
+      1. p^T \cdot F \cdot p' = 0
+      2. [u  v  1]
+         \begin{bmatrix}
+         F_{11} & F_{12} & F_{13} \\
+         F_{21} & F_{22} & F_{23} \\
+         F_{31} & F_{32} & F_{33}
+         \end{bmatrix}
+         \begin{bmatrix}
+         u' \\
+         v' \\
+         1
+         \end{bmatrix} = 0
+      3. [
+         (u * F_{11} + v * F_{21} + F_{31})
+         (u * F_{12} + v * F_{22} + F_{32})
+         (u * F_{13} + v * F_{23} + F_{33})
+         ]
+         \begin{bmatrix}
+         u' \\
+         v' \\
+         1
+         \end{bmatrix} = 0
+      4. u'(u * F_{11} + v * F_{21} + F_{31}) +
+         v'(u * F_{12} + v * F_{22} + F_{32}) +
+         (u * F_{13} + v * F_{23} + F_{33}) = 0
+      5. [
+         u'u v'u u
+         u'v v'v v
+         u'  v'  1
+         ]
+         \begin{bmatrix}
+         F_{11} \\
+         F_{12} \\
+         F_{13} \\
+         F_{21} \\
+         F_{22} \\
+         F_{23} \\
+         F_{31} \\
+         F_{32} \\
+         F_{33}
+         \end{bmatrix} = 0
+    - With 8 perfect matches, we can solve for F directly
+    - Since our matches probably have some error, it is usually better to use more than 8 and find F with the least squared error using SVD
+    - Our resulting F might have rank 3, but the real F should only be rank 2, but we can fix this using SVD
+
+**** dealing with noise
+     
+     https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar
+     - RANSAC: random simple concensus. We can take random samples of matches and use them to construct F, then take the best one (the fundamental matrix with the most inliers)
+     - Least Median Squares: find the fundamental matrix that minimizes the median of the squares of our matches, instead of the sum/average of squares
+
+** image rectification
+   - It would be useful for future calculations if our cameras were parallel.
+   - From above:
+     + when our cameras are parallel, their epipoles are at infinity
+     + all of our epipolar lines intersect at the epipole
+   - we can use the fundamental matrix to find the epipole, then use this to create a homography that maps these epipoles to a point at infinity
+   - our new camera planes (after this transformation) should be parallel
+*** TODO algo
+
+* Depth, Disparity with parallel cameras
+  https://blog.pollithy.com/vision/epipolar-geometry
 
 * TODO extra sources
-** https://blog.pollithy.com/vision/epipolar-geometry
-** https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar
 ** https://engineering.purdue.edu/kak/Tutorials/StereoRectification.pdf
 ** https://github.com/eddiecorrigall/Vision/blob/master/Stereo/rectify.py
 ** https://stackoverflow.com/questions/36172913/opencv-depth-map-from-uncalibrated-stereo-system

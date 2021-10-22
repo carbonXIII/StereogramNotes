@@ -1,0 +1,32 @@
+#+TITLE: "Depth Finding Algorithm" for Design Doc
+
+* Technical objectives
+  Probably including some basic input/output description and acceptance criteria
+  
+* Research
+  Background research on math/existing algorithms that we will need to develop our solution
+
+* Design
+  Describe the algorithm we are actually going to use (referencing ideas / other algorithms from the research section)
+
+* Testing Methodology
+  How are we going to take our rather large (partially existing) dataset and use it to validate that our algorithm meets the AC
+  Do we need to generate additonal test data for validation? If so how will we do it?
+  
+* Development Timeline
+  I honestly haven't thought about this one yet
+
+* Conclusions
+** Overview of the final design
+   
+** Testing Results
+   What are the test results?
+
+*** Acceptance Criteria
+    Do those test results mean our solution passed the AC?
+
+*** Possible Issues
+    Probably not going to end up with a generally applicable solution, so
+    probably mention the downsides (as reflected in test data) and why it still
+    meets the AC regardless.
+  

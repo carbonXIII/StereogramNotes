@@ -56,6 +56,49 @@
   - f: focal length
   - P: principal point in image space (probably the center, assuming the image is unedited)
   - U, V: vanishing points in image space
+    
+* Homogenous Coordinates
+  https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf
+
+** normalization
+  - Points of the form <x, y, 1> when normalized.
+  - We can recover our 2d image coordinates (x, y) from any homogenous vector by
+    dividing by the third parameter: <x, y, z> -> <x/z, y/z, 0>
+
+** points at infinity
+   - <x, y, 0> is a point at infinity in the direction of (x,y)
+
+** lines
+   - Lines described using vectors <a, b, c>, where
+     + -a/b is the slope
+     + -c/b is the y intercept
+   - A point, p, is on a line, l, when p \dot l = 0
+   - The intersection of 2 lines, \alpha and \beta is \alpha \times \beta
+     + the intersection of parallel lines is a point at infinity in the direction of the lines <b, -a, 0>
+
+** transformations
+  - Matrices on homogeneous coordinates are useful for describing transformations
+  - Can map between normal points and points and infinity
+
+** 3D
+   - Follows from 2D:
+     + Point <x, y, z, 1>
+     + Plane <a, b, c, d>, Point on Plane \dot Plane = 0
+   - Projection mapping, H: mapping from 3d point to camera space
+
+** Vanishing points and vanishing lines
+   - Vanishing point: given a 3d direction <a, b, c> we can apply the camera
+     intrinsic matrix K to get a point in image space
+     + Importantly this process is reversible, so if we can find the vanishing point in 2D, we can find the direction in 3D
+   - Given a coplanar set of pairs of parallel lines, we can find the
+     intersection point for each pair (a set of points and infinity) and this
+     set of points will be co-linear on a line at infinity
+     + Applying our projective transformation to this line at infinity, we get a vanishing line or horizon line
+     + The normal vector for our plane can be computed directly using this vanishing line and K
+   - We can use these relationships to calculate the angles between vectors or planes in our image:
+     + vanishing points -> 3D vectors -> angle
+     + vanishing lines -> normal of 3D planes -> angle
+     + with 3 vanishing points from 3 pair-wise perpendicular planes, we can use this relationship to solve for K
 
 * TODO extra sources
 ** http://www.fit.vutbr.cz/research/groups/graph/pclines/papers/2013-BMVC-Dubska-VanishingPointsDetection.pdf
