@@ -1,4 +1,4 @@
 **/*.avi
 **/__pycache__/
-**/*.pdf
-**/*.tex
+notes/*.pdf
+notes/*.tex
