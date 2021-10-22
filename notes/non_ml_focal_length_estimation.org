@@ -1,4 +1,5 @@
 #+TITLE: Estimating focal length with only CV
+#+OPTIONS: toc:nil
 
 * fSpy
   https://github.com/stuffmatic/fSpy

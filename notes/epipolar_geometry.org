@@ -1,5 +1,6 @@
 #+TITLE: Epipolar Geometry
 #+LATEX_HEADER: \usepackage[margin=0.5in]{geometry}
+#+OPTIONS: toc:nil
 
 * Fundamental Matrix
   https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf
