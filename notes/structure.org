@@ -1,16 +1,77 @@
 #+TITLE: "Depth Finding Algorithm" for Design Doc
 
 * Technical objectives
-  Probably including some basic input/output description and acceptance criteria
+** input
+  - From the focal length estimator, we expect to have the focal length of the
+    cameras. We will assume that the focal length of the two cameras are the
+    same.
+  - We also expect to have input stereograms. These stereograms will most likely
+    be somewhat noisy. There may also be some slight variations in position,
+    rotation, or scale between the two images, since they will most likely be
+    scans of a physical photograph.
+  - There may be some distortion in the photographs themselves, resulting from
+    inconsistent focal length throughout the lense. This is assumed to be negligible.
+** output
+  - An RGBD image we can display to the user: each pixel will have Red, Green, Blue, and estimated depth
+*** Acceptance Criteria
+  - The estimated distance between any 2 points in the image should be accurate to within a foot
   
 * Research
   Background research on math/existing algorithms that we will need to develop our solution
 
+** how humans perceive depth
+   - things appear smaller as they move further away
+   - seeing things from 2 different angles (binocular vision) can resolve problems of depth when we don't know objects' relative size.
+** talk about homogenous coordinates
+   - in order to talk more concretely about how a stereogram camera setup mirrors the human eyes, we need the correct mathematical tools
+   - homogeneous coordinates provide an extremely useful way to build upon the concepts of linear algebra to describe more types of transformations
+   - for this first part, we will focus on 2D for simplicity, but all of the ideas we will cover can be easily extended to 3D
+*** intro
+   - in traditional cartesian coordinates, a point is described as <x, y>.
+   - in homogeneous coordinates, this point can be described by any point of the form <xZ, yZ, Z>, where Z is a non-zero real number
+   - this new coordinate Z, acts as a normalization factor. Scaling our vector by any non-zero scaling factor yields the same point 
+   - to convert back into traditional coordinates, all we have to do is divide by our normalization factor
+*** points at infinity
+   - what happens when our normalization factor is zero?
+   - intuitively, when we take a point like <x, y, 0> and we divide by the scaling factor, we end up with our x and y coordinates at positive or negative infinity
+   - therefore, a point <x, y, 0> represents a point infinitely far away in the direction <x, y> or <-x, -y>
+*** lines
+   - lines are described using the same format <a, b, c>, where -a/b is the slope and -c/b is the y-intercept.
+   - we can test if a point is on a line by taking the dot product. when the dot product is 0, the point is one the line.
+   - the intersection point of 2 lines is \alpha \times \beta.
+   - when the lines are parallel their intersection is a point at infinity in the same direction as the lines
+*** transformations
+   - now that we have a basic understanding of homogeneous coordiantes, we can talk about transformations
+   - in cartesian coordinates, linear transformations are limited. they cannot describe translatons, and they cannot describe transformations that break parallelism (i.e. after a linear transformation lines that were once parallel, remain parallel).
+   - we can take any transformation matrix in cartesian coordinates, A, and expand it to work with homogenous coordinates like this [insert matrix here]
+   - we can expand this definition by adding in a translation vector t, a fixed translation vector that will be added to all of our points [show matrix]
+   - we can gain additional degrees of freedom by add in a new vector v. when this vector is non-zero, our transformation will no longer preserve parallelism
+     
+** talk about camera model
+*** projection
+    - how do these additional degrees of freedom help us to model the camera?
+    - imagine for a moment you are standing in the center of long straight hallway, looking from one end to the other. the lines forming the edges of the hallway are parallel in 3D space. if you were to extend them, they would never intersect.
+    - however, from your perspective these lines appear to get closer together as you look further down the hallway. they are no longer parallel.
+    - if you take a picture of the hallway, the same phenomena can be observed.
+    - both your eyes and the camera map parallel lines in 3D, to non-parallel lines in their 2D image space. in order to describe such a transformation, we need to use homogeneous coordinates
+*** talk about how K reflects distortion
+** talk about depth from stereograms using epipolar geometry
+*** how does the stereo matcher work
+
 * Design
   Describe the algorithm we are actually going to use (referencing ideas / other algorithms from the research section)
 
+  1. Find matches between images
+  2. Estimate the fundamental matrix
+  3. Rectify our image (and fix potential issues with alignment / shearing)
+  4. Use a stereo matcher to find better matches per-pixel to estimate disparity
+  5. Use focal length to estimate depth per pixel
+
+** potential caveats
+*** stereo matcher can be better if we can account for distortion
+
 * Testing Methodology
-  How are we going to take our rather large (partially existing) dataset and use it to validate that our algorithm meets the AC
+  How are we going to take a rather large (partially existing) dataset and use it to validate that our algorithm meets the AC
   Do we need to generate additonal test data for validation? If so how will we do it?
   
 * Development Timeline
