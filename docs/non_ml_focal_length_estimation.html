@@ -1,0 +1,124 @@
+<h1 id="fspy">fSpy</h1>
+<p><a href="https://github.com/stuffmatic/fSpy">https://github.com/stuffmatic/fSpy</a></p>
+<p>Attempts to find vanishing points and focal length based on user inputted perpendicular lines in the image, but doesn't do the best job for almost parallel lines. Can we achieve better accuracy if we cut user input of perpendicular lines?</p>
+<h1 id="vanishing-points">Vanishing Points</h1>
+<p><a href="https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar.pdf">https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar.pdf</a></p>
+<ul>
+<li>if we have accurate vanishing points, we can get the focal length</li>
+<li>we need accurate parallel lines to estimate the vanishing point, so need some way to find those so maybe impossible for our project (where the only dependable straight lines are probably the pyramids)</li>
+</ul>
+<h2 id="hough-transform">Hough Transform</h2>
+<p><a href="http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/HoughTrans_lines_09.pdf">http://web.ipac.caltech.edu/staff/fmasci/home/astro_refs/HoughTrans_lines_09.pdf</a></p>
+<ul>
+<li>Detects probably straight lines</li>
+<li>Doesn't necessarily find probably parallel lines, but I guess we can do some clustering</li>
+<li>Maybe ML solution to finding good lines in our image</li>
+</ul>
+<h3 id="algorithm">algorithm</h3>
+<ul>
+<li>sobel or canny to find edge points</li>
+<li>map points to hough transform (additive)</li>
+<li>find possible centers corresponding to valid lines</li>
+<li>assuming lines fit into perpendicular groups, valid vanishing points should be at the intersection of some of these lines</li>
+<li>(alt) find vanishing points directly by fitting sine curves to hough transform
+<ul>
+<li><a href="https://link.springer.com/content/pdf/10.1007/3-540-48311-X_137.pdf">https://link.springer.com/content/pdf/10.1007/3-540-48311-X_137.pdf</a></li>
+</ul></li>
+</ul>
+<h3 id="caveats">caveats</h3>
+<ul>
+<li>NOT ALL SCENES HAVE APPROPRIATE STRUCTURE FOR THE DETECTION OF ORTHOGONAL VANISHING POINTS</li>
+</ul>
+<h2 id="motion-vectors">Motion vectors</h2>
+<p><a href="http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&amp;zoom=100,130,908">http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&amp;zoom=100,130,908</a></p>
+<ul>
+<li>Even if our scene might lack good target lines, we have 2 cameras</li>
+<li>In the paper, motion vectors can be drawn between consecutive frames where a car moves relative to the camera</li>
+<li>In our case, the entire scene has moved relative to the camera</li>
+</ul>
+<h3 id="algortithm">algortithm</h3>
+<ul>
+<li>extract good features from both camera frames</li>
+<li>(maybe need to align the rotation of the 2 frames using the features)</li>
+<li>map the features from each frame to produce "motion" lines</li>
+<li>use the lines/vectors to find vanishing point(s)</li>
+</ul>
+<h3 id="caveats-1">caveats</h3>
+<ul>
+<li>THIS DOES ASSUME BOTH CAMERAS HAVE THE SAME FOCAL LENGTH</li>
+</ul>
+<h1 id="focal-length-from-vanishing-points">Focal Length from Vanishing Points</h1>
+<ul>
+<li><a href="https://stackoverflow.com/questions/53873082/focal-length-computation-from-vanishing-points">https://stackoverflow.com/questions/53873082/focal-length-computation-from-vanishing-points</a></li>
+<li><a href="http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&amp;zoom=100,130,908">http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&amp;zoom=100,130,908</a></li>
+</ul>
+<pre class="example"><code>f = sqrt(-(U - P) * (V - P))
+</code></pre>
+<ul>
+<li>f: focal length</li>
+<li>P: principal point in image space (probably the center, assuming the image is unedited)</li>
+<li>U, V: vanishing points in image space</li>
+</ul>
+<h1 id="homogenous-coordinates">Homogenous Coordinates</h1>
+<p><a href="https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf">https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf</a></p>
+<h2 id="normalization">normalization</h2>
+<ul>
+<li>Points of the form &lt;x, y, 1&gt; when normalized.</li>
+<li>We can recover our 2d image coordinates (x, y) from any homogenous vector by dividing by the third parameter: &lt;x, y, z&gt; -&gt; &lt;x/z, y/z, 0&gt;</li>
+</ul>
+<h2 id="points-at-infinity">points at infinity</h2>
+<ul>
+<li>&lt;x, y, 0&gt; is a point at infinity in the direction of (x,y)</li>
+</ul>
+<h2 id="lines">lines</h2>
+<ul>
+<li>Lines described using vectors &lt;a, b, c&gt;, where
+<ul>
+<li>-a/b is the slope</li>
+<li>-c/b is the y intercept</li>
+</ul></li>
+<li>A point, p, is on a line, l, when p ˙ l = 0</li>
+<li>The intersection of 2 lines, α and β is α × β
+<ul>
+<li>the intersection of parallel lines is a point at infinity in the direction of the lines &lt;b, -a, 0&gt;</li>
+</ul></li>
+</ul>
+<h2 id="transformations">transformations</h2>
+<ul>
+<li>Matrices on homogeneous coordinates are useful for describing transformations</li>
+<li>Can map between normal points and points and infinity</li>
+</ul>
+<h2 id="d">3D</h2>
+<ul>
+<li>Follows from 2D:
+<ul>
+<li>Point &lt;x, y, z, 1&gt;</li>
+<li>Plane &lt;a, b, c, d&gt;, Point on Plane ˙ Plane = 0</li>
+</ul></li>
+<li>Projection mapping, H: mapping from 3d point to camera space</li>
+</ul>
+<h2 id="vanishing-points-and-vanishing-lines">Vanishing points and vanishing lines</h2>
+<ul>
+<li>Vanishing point: given a 3d direction &lt;a, b, c&gt; we can apply the camera intrinsic matrix K to get a point in image space
+<ul>
+<li>Importantly this process is reversible, so if we can find the vanishing point in 2D, we can find the direction in 3D</li>
+</ul></li>
+<li>Given a coplanar set of pairs of parallel lines, we can find the intersection point for each pair (a set of points and infinity) and this set of points will be co-linear on a line at infinity
+<ul>
+<li>Applying our projective transformation to this line at infinity, we get a vanishing line or horizon line</li>
+<li>The normal vector for our plane can be computed directly using this vanishing line and K</li>
+</ul></li>
+<li>We can use these relationships to calculate the angles between vectors or planes in our image:
+<ul>
+<li>vanishing points -&gt; 3D vectors -&gt; angle</li>
+<li>vanishing lines -&gt; normal of 3D planes -&gt; angle</li>
+<li>with 3 vanishing points from 3 pair-wise perpendicular planes, we can use this relationship to solve for K</li>
+</ul></li>
+</ul>
+<h1 id="extra-sources"><span class="todo TODO">TODO</span> extra sources</h1>
+<h2 id="httpwww.fit.vutbr.czresearchgroupsgraphpclinespapers2013-bmvc-dubska-vanishingpointsdetection.pdf"><a href="http://www.fit.vutbr.cz/research/groups/graph/pclines/papers/2013-BMVC-Dubska-VanishingPointsDetection.pdf">http://www.fit.vutbr.cz/research/groups/graph/pclines/papers/2013-BMVC-Dubska-VanishingPointsDetection.pdf</a></h2>
+<p>Diamond space ???</p>
+<h2 id="httpsieeexplore.ieee.orgdocument5456535"><a href="https://ieeexplore.ieee.org/document/5456535">https://ieeexplore.ieee.org/document/5456535</a></h2>
+<h2 id="httpsieeexplore.ieee.orgdocument6671929"><a href="https://ieeexplore.ieee.org/document/6671929">https://ieeexplore.ieee.org/document/6671929</a></h2>
+<h2 id="httpsdl.acm.orgdoi10.11453402597.3402602"><a href="https://dl.acm.org/doi/10.1145/3402597.3402602">https://dl.acm.org/doi/10.1145/3402597.3402602</a></h2>
+<p>Not sure if I can get access to this one</p>

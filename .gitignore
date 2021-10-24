@@ -1,4 +1,5 @@
 **/*.avi
 **/__pycache__/
-notes/*.pdf
-notes/*.tex
+notes/ltximg/
+notes/badpngs/
+**/.*#

@@ -1,0 +1,134 @@
+<h1 id="fundamental-matrix">Fundamental Matrix</h1>
+<p><a href="https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf">https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf</a></p>
+<h2 id="typical-epipolar-camera-setup">typical epipolar camera setup</h2>
+<ul>
+<li>baseline: the line between the camera centers</li>
+<li>epipole: the intersection of the baseline and the respective camera plane
+<ul>
+<li>this is a point at infinity if the cameras are parallel</li>
+</ul></li>
+</ul>
+<h3 id="for-some-3d-point-p-in-both-cameras-image-space">for some 3D point, P, in both cameras' image space</h3>
+<ul>
+<li>epipolar plane: the plane formed by the camera centers and P</li>
+<li>epipolar line: the intersection of the epipolar plane and the respective camera plane
+<ul>
+<li>for any choice of P, the epipolar line will contain the epipole (given the definition of epipolar plane)</li>
+</ul></li>
+</ul>
+<h2 id="essential-matrix">essential matrix</h2>
+<ul>
+<li>if we have some point p in one image, and want to find it's match p' in the other image, we know that it must lie on the corresponding epipolar line for P</li>
+<li>to find the epipolar line we must know the relative position of our cameras (rotation and translation)</li>
+<li>Assuming we have 2 canonical cameras (cameras with focal length of 1, so K = K' = I):
+<ul>
+<li>their projection matrices will be M = [I 0] and M' = [R<sup>T</sup> -R<sup>T</sup> ċ T]</li>
+<li>for some point, p' on camera 2's image plane, we know that it maps to Rp' + T on camera 1's image plane</li>
+<li>Since T and (Rp' + T) are on the epipolar plane for P, T × (Rp' + T) = T × Rp' is the normal of the plane</li>
+<li>Since p is on the epipolar plane as well, <span class="math inline"><em>p</em><sup><em>T</em></sup> ⋅ (<em>T</em>×<em>R</em><em>p</em>′) = 0</span></li>
+<li>Rewriting T × Rp' as T<sub>×</sub> ċ Rp', p<sup>T</sup>  ⋅ [<em>T</em><sub>×</sub>]R ċ p' = 0</li>
+<li>our essential matrix, E = [T<sub>×</sub>]R, so pEp' = 0</li>
+</ul></li>
+</ul>
+<h2 id="fundamental-matrix-1">fundamental matrix</h2>
+<ul>
+<li>we assumed the camera's were canonical to get the essential matrix, so we can factor K back into the equation:
+<ul>
+<li>p<sup>T</sup> ċ K<sup>-T</sup> ċ E ċ K'<sup>-1</sup> ċ p' = 0</li>
+<li>fundamental matrix, F = K<sup>-T</sup> ċ E ċ K'<sup>-1</sup> = K<sup>-T</sup> ċ T<sub>×</sub> ċ R ċ K'<sup>-1</sup></li>
+</ul></li>
+</ul>
+<h3 id="properties">properties:</h3>
+<ul>
+<li>p<sup>T</sup> ċ F: epipolar line in our first image</li>
+<li>F ċ p': epipolar line in our second image</li>
+<li>scale for lines doesn't matter, so F has only 8 DOF</li>
+<li>F maps points to lines so it should only have rank 2</li>
+</ul>
+<h3 id="estimation-8-point-algo">estimation, 8-point algo:</h3>
+<ul>
+<li>without knowing any of our camera parameters (K, K', T, R) if we have enough independent epipolar lines, we should be able to solve for F</li>
+<li>given 2 matching points in our images, p = (u, v, 1) and p' = (u', v', 1):
+<ol>
+<li><p>p<sup>T</sup> ċ F ċ p' = 0</p></li>
+<li><p>[u v 1]</p>
+<p>\begin{bmatrix} u'<br />
+v'<br />
+1 \end{bmatrix} = 0</p></li>
+<li><p>[ (u * F<sub>11</sub> + v * F<sub>21</sub> + F<sub>31</sub>) (u * F<sub>12</sub> + v * F<sub>22</sub> + F<sub>32</sub>) (u * F<sub>13</sub> + v * F<sub>23</sub> + F<sub>33</sub>) ]</p>
+<p>\begin{bmatrix} u'<br />
+v'<br />
+1 \end{bmatrix} = 0</p></li>
+<li><p>u'(u * F<sub>11</sub> + v * F<sub>21</sub> + F<sub>31</sub>) + v'(u * F<sub>12</sub> + v * F<sub>22</sub> + F<sub>32</sub>) + (u * F<sub>13</sub> + v * F<sub>23</sub> + F<sub>33</sub>) = 0</p></li>
+<li><p>[ u'u v'u u u'v v'v v u' v' 1 ]</p>
+<p>\begin{bmatrix} F<sub>11</sub><br />
+F<sub>12</sub><br />
+F<sub>13</sub><br />
+F<sub>21</sub><br />
+F<sub>22</sub><br />
+F<sub>23</sub><br />
+F<sub>31</sub><br />
+F<sub>32</sub><br />
+F<sub>33</sub> \end{bmatrix} = 0</p></li>
+</ol></li>
+<li>With 8 perfect matches, we can solve for F directly</li>
+<li>Since our matches probably have some error, it is usually better to use more than 8 and find F with the least squared error using SVD</li>
+<li>Our resulting F might have rank 3, but the real F should only be rank 2, but we can fix this using SVD</li>
+</ul>
+<ol>
+<li><p>dealing with noise</p>
+<p><a href="https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar">https://www.cs.princeton.edu/courses/archive/fall13/cos429/lectures/11-epipolar</a></p>
+<ul>
+<li>RANSAC: random simple concensus. We can take random samples of matches and use them to construct F, then take the best one (the fundamental matrix with the most inliers)</li>
+<li>Least Median Squares: find the fundamental matrix that minimizes the median of the squares of our matches, instead of the sum/average of squares</li>
+</ul></li>
+</ol>
+<h2 id="image-rectification">image rectification</h2>
+<ul>
+<li>It would be useful for future calculations if our cameras were parallel.</li>
+<li>From above:
+<ul>
+<li>when our cameras are parallel, their epipoles are at infinity</li>
+<li>all of our epipolar lines intersect at the epipole</li>
+</ul></li>
+<li>we can use the fundamental matrix to find the epipole, then use this to create a homography that maps these epipoles to a point at infinity</li>
+<li>our new camera planes (after this transformation) should be parallel</li>
+</ul>
+<h3 id="algorithm">algorithm</h3>
+<p><a href="https://engineering.purdue.edu/kak/Tutorials/StereoRectification.pdf">https://engineering.purdue.edu/kak/Tutorials/StereoRectification.pdf</a> Loop and Zhang break down the homography into 3 parts</p>
+<ol>
+<li><p>projection component</p>
+<p>Maps the epipoles to some point at infinity</p></li>
+<li><p>similarity component</p>
+<p>Ensures the epipoles in both images are on the X axis and that the images are aligned</p></li>
+<li><p>shearing component</p>
+<ul>
+<li>Minimizes projective distortion by making our final aspect ratio as close to 1:1 as possible</li>
+<li>Implementation <a href="https://scicomp.stackexchange.com/questions/2844/shearing-and-hartleys-rectification">https://scicomp.stackexchange.com/questions/2844/shearing-and-hartleys-rectification</a></li>
+</ul></li>
+</ol>
+<h1 id="depth-disparity-with-parallel-cameras">Depth, Disparity with parallel cameras</h1>
+<p><a href="https://blog.pollithy.com/vision/epipolar-geometry">https://blog.pollithy.com/vision/epipolar-geometry</a></p>
+<ul>
+<li><p>f: focal length in camera units (pixels)</p></li>
+<li><p>x<sub>(l, r)</sub>: (p, p')<sub>x</sub> in camera units (pixels)</p></li>
+<li><p>b: baseline, distance between the camera centers in real units</p></li>
+<li><p>b<sub>(l, r)</sub>: displacement between camera (1, 2)'s center and P along the baseline</p></li>
+<li><p>z: depth, distance between either camera and P, perpendicular to the baseline</p></li>
+<li><p>d: disparity, x<sub>l</sub> + x<sub>r</sub></p></li>
+<li><p>(As the triangles are similar) x<sub>l</sub> / d = b<sub>l</sub> / b</p>
+<ul>
+<li>→ b<sub>l</sub> = x<sub>l</sub> ċ b / d</li>
+</ul></li>
+<li><p>(As the triangles are similar) x<sub>l</sub> / f = b<sub>l</sub> / z</p>
+<ul>
+<li>→ z = f ċ b<sub>l</sub> / x<sub>l</sub></li>
+</ul></li>
+<li><p><span class="math inline">$z = \frac{ f \cdot x_l \cdot b }{ x_l \cdot d }$</span></p>
+<ul>
+<li>→ <span class="math inline">$z = \frac{f \cdot b}{d}$</span></li>
+</ul></li>
+</ul>
+<h1 id="extra-sources"><span class="todo TODO">TODO</span> extra sources</h1>
+<h2 id="httpsgithub.comeddiecorrigallvisionblobmasterstereorectify.py"><a href="https://github.com/eddiecorrigall/Vision/blob/master/Stereo/rectify.py">https://github.com/eddiecorrigall/Vision/blob/master/Stereo/rectify.py</a></h2>
+<h2 id="httpsstackoverflow.comquestions36172913opencv-depth-map-from-uncalibrated-stereo-system"><a href="https://stackoverflow.com/questions/36172913/opencv-depth-map-from-uncalibrated-stereo-system">https://stackoverflow.com/questions/36172913/opencv-depth-map-from-uncalibrated-stereo-system</a></h2>

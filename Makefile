@@ -1,6 +1,6 @@
 .PHONY: all
-all: docs/epipolar_geometry.pdf docs/non_ml_focal_length_estimation.pdf
+all: docs/epipolar_geometry.html docs/non_ml_focal_length_estimation.html docs/final.html
 
-docs/%.pdf: notes/%.org
-	emacs -u "$(id -un)" --batch $^ -f org-latex-export-to-pdf
-	cp $(basename $^).pdf $@
+docs/%.html: notes/%.org
+	scripts/fix_svg.py $^ docs/
+	pandoc $^ > $@
