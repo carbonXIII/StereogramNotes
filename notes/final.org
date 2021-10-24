@@ -31,32 +31,30 @@
 
 #+begin_src latex :file badpngs/cross_prod.png :results file graphics :exports output
   \begin{center}
-  
   \[
   \begin{bmatrix}
-  a \\
-  b \\
-  c
+    a \\
+    b \\
+    c
   \end{bmatrix} \times
   \begin{bmatrix}
-  a \\
-  b \\
-  d \\
+    a \\
+    b \\
+    d \\
   \end{bmatrix} =
   \begin{bmatrix}
-  b*d - b*c \\
-  a*c - a*d \\
-  a*b - a*b
+    b*d - b*c \\
+    a*c - a*d \\
+    a*b - a*b
   \end{bmatrix} \propto
   \begin{bmatrix}
-  b \\
-  -a \\
-  0
+    b \\
+    -a \\
+    0
   \end{bmatrix}
   \]
   
   \caption{Intersection of parallel lines.}
-  
   \end{center}
 #+end_src
 
@@ -66,8 +64,32 @@
 @@comment: begin fixed cross_prod@@
 [[file:svgs/cross_prod.svg]]
 @@comment: end fixed cross_prod@@
-
   
   \bigskip
 
-  How do these coordinates help us to model the camera? 
+  Transformations in homogeneous coordinates are modelled using matrix operations, just like cartesian coordinates. However, as homogeneous coordinates add an extra normalization factor, these matrices have additional degrees of freedom when compared to a similar matrix in cartesian coordinates. 
+
+#+begin_src latex :file badpngs/proj_matrix_breakdown.png :results file graphics :exports output
+  \begin{center}
+  \[
+  P =
+  \begin{bmatrix}
+    A & t \\
+    v & b
+  \end{bmatrix}
+  \]
+  
+  \caption{Breakdown of a matrix in homogeneous coordinates}
+  \end{center}
+#+end_src
+
+#+RESULTS:
+[[file:badpngs/proj_matrix_breakdown.png]]
+
+@@comment: begin fixed proj_matrix_breakdown@@
+[[file:svgs/proj_matrix_breakdown.svg]]
+@@comment: end fixed proj_matrix_breakdown@@
+
+  The equation above shows the breakdown of a matrix in homogeneous coordinates, $P$, into its component parts. In the 2D case, $A$ is a 2x2 matrix, $t$ and $v$ are vectors, and $b$ is a scalar. When $v = 0$, and $b = 1$, matrix $P$ performs the same transformation as the $A$ followed by some translation by $t$, but on homogeneous coordinates. Transformations in cartesian coordinates are limited to affine transformations: transformations that maintain parallelism: lines that were parallel before the transformation remain parallel after it. However, by varying $v$ in our new matrix $P$, we are capable of going one step further: projection. In a projection matrix, parallelism does not have to be preserved. An additional side affect of varying $v$ is that $P$ can now map points at infinity to regular points and vice-versa.
+
+  How does these additional degrees of freedom help us to model the camera?
