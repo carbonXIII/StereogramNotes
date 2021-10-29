@@ -1,0 +1,12 @@
+#+LATEX_HEADER: \usepackage{tikz}
+#+header: :imagemagick yes :iminoptions -density 600 :imoutoptions -geometry 400
+#+OPTIONS: tex:dvisvgm 
+
+#+begin_src latex :file badpngs/diagram.png :results file graphics :exports output
+  \begin{tikzpicture}
+    \coordinate [label=$A$] (A) at (0, 0);
+  \end{tikzpicture}
+#+end_src
+
+#+RESULTS:
+[[file:badpngs/diagram.png]]

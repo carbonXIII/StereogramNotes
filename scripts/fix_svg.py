@@ -3,17 +3,41 @@
 import sys
 import os
 import re
+import subprocess
 
 def process_svg(svg):
     bg = re.compile(r'<rect.*fill=\'(.*)\'/>')
     bg_match = bg.search(svg)
     svg = svg[:bg_match.start(1)] + 'none' + svg[bg_match.end(1):]
 
-    fg = re.compile(r'<g.*fill=\'(.*)\'.*>')
-    fg_match = fg.search(svg)
-    svg = svg[:fg_match.start(1)] + '#000000' + svg[fg_match.end(1):]
+    fg = re.compile(r'<g.*fill=\'(.*?)\'.*>')
+    off = 0
+    while True:
+        fg_match = fg.search(svg, off)
+        if fg_match is None:
+            break
+        print(fg_match)
+
+        off = fg_match.end()
+
+        svg = svg[:fg_match.start(1)] + '#000000' + svg[fg_match.end(1):]
+
+    path = re.compile(r'<path.*stroke=\'(.*?)\'.*>')
+    off = 0
+    while True:
+        path_match = path.search(svg, off)
+        if path_match is None:
+            break
+        print(path_match)
+
+        off = path_match.end()
+
+        svg = svg[:path_match.start(1)] + '#000000' + svg[path_match.end(1):]
 
     return svg
+
+def convert_to_png(svg_path):
+    subprocess.run(['inkscape', '--export-type=png', '--export-dpi=192', svg_path])
 
 if __name__ == '__main__':
     if len(sys.argv) < 3:
@@ -44,8 +68,11 @@ if __name__ == '__main__':
 
         svg = process_svg(svg)
 
-        with open('{}/svgs/{}.svg'.format(out_dir, base), 'w') as f:
+        svg_path = '{}/images/{}.svg'.format(out_dir, base)
+        with open(svg_path, 'w') as f:
             f.write(svg)
+
+        convert_to_png(svg_path)
 
         mark_start = '@@comment: begin fixed {}@@'.format(base)
         mark_end = '@@comment: end fixed {}@@'.format(base)
@@ -55,7 +82,7 @@ if __name__ == '__main__':
         if mark_match is not None:
             org = org[:mark_match.start()] + org[mark_match.end():]
 
-        embed = '\n\n{}\n[[file:svgs/{}.svg]]\n{}\n'.format(mark_start, base, mark_end)
+        embed = '\n\n{}\n[[file:images/{}.png]]\n{}\n'.format(mark_start, base, mark_end)
 
         org = org[:match.end()] + embed + org[match.end():]
 

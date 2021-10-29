@@ -65,7 +65,7 @@
 ** normalization
   - Points of the form <x, y, 1> when normalized.
   - We can recover our 2d image coordinates (x, y) from any homogenous vector by
-    dividing by the third parameter: <x, y, z> -> <x/z, y/z, 0>
+    dividing by the third parameter: <x, y, z> -> <x/z, y/z, 1>
 
 ** points at infinity
    - <x, y, 0> is a point at infinity in the direction of (x,y)
