@@ -129,3 +129,6 @@
 * TODO extra sources
 ** https://github.com/eddiecorrigall/Vision/blob/master/Stereo/rectify.py
 ** https://stackoverflow.com/questions/36172913/opencv-depth-map-from-uncalibrated-stereo-system
+** https://scipy-cookbook.readthedocs.io/items/bundle_adjustment.html
+*** http://grail.cs.washington.edu/projects/bal/
+** https://www.asprs.org/a/publications/proceedings/baltimore09/0110.pdf
