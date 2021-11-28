@@ -126,9 +126,43 @@
   - $z = \frac{ f \cdot x_l \cdot b }{ x_l \cdot d }$
     + \rightarrow $z = \frac{f \cdot b}{d}$
 
+* Dealing with Holes
+  - lack of texture / good features in some areas of the image leads to holes where the disparity (and therefore depth) is inaccurate
+  - just like the border at the side of the image where the right image does not share features,
+    these holes often have disparity 0 by default (interpreted as infinite depth when we do the conversion to real coordinates)
+
+** Semi-global block matching (stereosgbm)
+   https://ww2.mathworks.cn/help/visionhdl/ug/stereoscopic-disparity.html
+   how does the stereo matching algorithm work, and why might that result in holes
+   
+*** parameters
+**** disparity level (numDisparities in OpenCV)
+     - how many pixels to check in the right image for a pixel in the left image
+**** number of directions
+     - OpenCV's StereoSGBM only checks in one direction (left-to-right)
+**** speckle (speckleWindow, minDisparity, speckleRange)
+     - At the border of objects, when the sliding window includes both the foreground and background, sgbm might start to find in accurate matches between an object and the background
+     - Setting a speckleWindow size, we can filter out matches where some disparities in the window are outside specle range
+**** smoothing parameters (P1, P2)
+     - Penalties controlling how smooth the output should be (more penalty, more benefit for smoothing out differences in neighborhing pixels)
+
 * TODO extra sources
 ** https://github.com/eddiecorrigall/Vision/blob/master/Stereo/rectify.py
 ** https://stackoverflow.com/questions/36172913/opencv-depth-map-from-uncalibrated-stereo-system
 ** https://scipy-cookbook.readthedocs.io/items/bundle_adjustment.html
 *** http://grail.cs.washington.edu/projects/bal/
 ** https://www.asprs.org/a/publications/proceedings/baltimore09/0110.pdf
+** https://www.robots.ox.ac.uk/~vgg/hzbook/hzbook2/HZepipolar.pdf
+** https://www.uio.no/studier/emner/matnat/its/nedlagte-emner/UNIK4690/v16/forelesninger/lecture_7_3-pose-from-epipolar-geometry.pdf
+** https://upcommons.upc.edu/bitstream/handle/2117/22931/1404-Exhaustive-linearization-for-robust-camera-pose-and-focal-length-estimation.pdf;jsessionid=84A342024F36F1138DB59816F97B7BA2?sequence=1
+** https://github.com/alexklwong/awesome-state-of-depth-completion
+
+* TODO extra topics
+** K as a pixel -> direction from center of camera mapping
+** epipoles as null vectors of fundamental matrix
+** epipoles can be on the same side of the image if the cameras are translated perpendicular to the image plane
+** camera pose from fundamental matrix
+*** Rodrigues rotation
+*** uvd in right camera to camera 1 xyz
+** holes in disparity map due to lack of texture, take advantage of rgb to smooth depth map
+*** StereoSGBM, how does it work

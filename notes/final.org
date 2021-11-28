@@ -7,7 +7,7 @@
 
   The focal length estimator should produce some expected of focal lengths. This focal length is assumed to be roughly the same for both cameras. We also expect to have 2 matching input stereograms, taken from cameras a reasonable distance apart, rotated to focus on a single focus target. These stereograms will most likely be somewhat noisy. There may also be slight variations in rotation, position, or scale between the two images (as they will most likely be scans of physical stereograms). There may also be some distortion due to inconsistencies in the focal length of the lense. This distortion is assumed to be negligible.
 
-  All of these different sources of error must be taken into account by the depth finding algorithm, and it must still be able to produce an accurate RGBD image. In later stages, this RGBD image will be used to find the distance between points in the image. We require the RGBD image to be accurate enough such that the measured distance is within one foot of the real distance.
+  All of these different sources of error must be taken into account by the depth finding algorithm, and it must still be able to produce an accurate RGBD image. In later stages, this RGBD image will be used to find the distance between points in the image. We require the RGBD image to be accurate enough such that the measured distance is within one foot of the real distance. [TODO: specify the maximum depth we want to be accurate to one foot within]
 
 * Research
   As our goal is to determine depth from a stereogram image, it is useful to first consider how humans perceive depth as a stereogram camera setup is modeled after the human eyes. One easy observation is that objects appear smaller as they move further away. This is helpful, as if we know the size of an object we can easily determine it's distance using only one eye. However, in some circumstances where the sizes of objects are unknown this is not possible. In these cases, being able to see the same scene from 2 different angles at once can help to resolve the depth of unknown objects. In our depth finding algorithm, we do not know the exact size of many of the objects in our image, so it is necessary to use the information from both images in order to determine the depth of objects in our scene.
@@ -385,7 +385,7 @@
   With our images now rectified and aligned, we can run a specialized feature matcher. This feature matcher takes advantage of the fact that matching points in our images should be horizontally aligned in order to do a more complete search with less false positive matches. This generates an estimated disparity value for each pixel in our image, which we can then use to calculate depth.
 
 * Design
-  Now that we have an understanding of the tools that are at our disposal to solve the problem, we can establish an initial design.
+  Now that we have an understanding of the tools that are at our disposal to solve the problem, we can establish a high level initial design.
 
   1. Find matches between images.
      + Detect features and generate feature descriptions.

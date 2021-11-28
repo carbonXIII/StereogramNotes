@@ -14,7 +14,7 @@
 ** output
   - An RGBD image we can display to the user: each pixel will have Red, Green, Blue, and estimated depth
 *** Acceptance Criteria
-  - The estimated distance between any 2 points in the image should be accurate to within a foot
+  - The estimated distance between any 2 points [in some valid distance range] in the image should be accurate to within a foot within some maximum range
   
 * Research
   Background research on math/existing algorithms that we will need to develop our solution
@@ -58,27 +58,59 @@
 ** talk about depth from stereograms using epipolar geometry
 *** how does the stereo matcher work
 
+** cleaning up our results
+*** bundle adjustment
+**** the problem
+**** cost function
+***** non-convex
+**** least squares solvers
+***** jacobian
+****** estimation using finite difference
+**** how it fits into our pipeline
+*** sparse to dense disparity mapping
+**** the problem
+**** how it might fit into our pipeline
+
 * Design
   Describe the algorithm we are actually going to use (referencing ideas / other algorithms from the research section)
 
-  1. Find matches between images
-  2. Estimate the fundamental matrix
-  3. Rectify our image (and fix potential issues with alignment / shearing)
-  4. Use a stereo matcher to find better matches per-pixel to estimate disparity
-  5. Use focal length to estimate depth per pixel
+** algo
+*** find then match features between our images
+*** estimate the essential matrix, guessing the parameters of our camera (i.e. f-stop ~ human eye, no distortion, principal point at the center of the image)
+*** convert our essential matrix estimate to pose information (rotation and translation (without scale))
+*** use bundle adjustment to refine our camera's intrinsic params (focal length, distortion) as well as extrinsic (pose)
+*** use our refined params to rectify our images
+*** use a stereo matcher to find per-pixel disparity information
+*** map depth to disparity using our estimate of the focal length (still without scale since we don't know the baseline)
+*** take ground truth length information and use it to estimate the scale of the scene (set the baseline)
 
-** potential caveats
-*** stereo matcher can be better if we can account for distortion
+** possible future updates
+*** use a better stereo matching techique to get disparity without holes (e.g. feature matching -> sparse-to-dense disparity model)
 
 * Testing Methodology
   How are we going to take a rather large (partially existing) dataset and use it to validate that our algorithm meets the AC
   Do we need to generate additonal test data for validation? If so how will we do it?
+** datasets
+*** Tsukuba
+**** how it was made
+**** issues
+** accuracy measurements
+**** +/- 20% depth maps to how much disparity
+**** mapping from our 20% accuracy statement to real world measurements (given the baseline and some range of valid distances)
+     i.e. how we take our test results and interpret them as pass/fail for our AC
+** performance and threading
+**** 1800 images is a lot, none of it is GPU accellerated. The best we can do without rewriting our depth pipeline is use more CPU cores.
   
 * Development Timeline
   I honestly haven't thought about this one yet
+** [9/18] [10/31]: Implement basic depth algorithm (without bundle adjustment, needs some adjustments to other hyperparams)
+** [11/12] [11/16]: Setup testing framework to find baseline metrics for our unrefined depth estimates
+** [11/16] [?]: Implement bundle adjustment and integrate it with the depth pipeline
+** [?] [?]: Dynamically update baseline (and then depth measurements) w.r.t. user inputted ground truth measurements
 
 * Conclusions
 ** Overview of the final design
+*** things that are yet to be implemented
    
 ** Testing Results
    What are the test results?
