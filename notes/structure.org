@@ -102,11 +102,11 @@
 **** 1800 images is a lot, none of it is GPU accellerated. The best we can do without rewriting our depth pipeline is use more CPU cores.
   
 * Development Timeline
-  I honestly haven't thought about this one yet
 ** [9/18] [10/31]: Implement basic depth algorithm (without bundle adjustment, needs some adjustments to other hyperparams)
 ** [11/12] [11/16]: Setup testing framework to find baseline metrics for our unrefined depth estimates
 ** [11/16] [?]: Implement bundle adjustment and integrate it with the depth pipeline
 ** [?] [?]: Dynamically update baseline (and then depth measurements) w.r.t. user inputted ground truth measurements
+** [?] [?]: Tune the hyperparameters for the stereo matcher (or find a better stereo matcher)
 
 * Conclusions
 ** Overview of the final design
