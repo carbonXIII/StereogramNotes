@@ -1,0 +1,61 @@
+* Technical Objectives
+** Input
+*** focal length
+    - From the focal length estimator, we expect to recieve a rough estimate of the focal length.
+    - This estimate is expected to have some error, so further refinement might be required to achieve a useful depth estimate.
+*** stereograms
+    - Pair of input images.
+    - As these are scans of historical photos, these are expected to be quite noisy.
+    - The position of the photo centers is also expected to vary between the 2 images.
+    - The images in this case are not cropped, so there will be additional noise around the edges.
+    - These images might have some degree of additional distortion, which we will not know ahead of time.
+*** additional ground truth data
+    - This data will provide a pair of points in one of the images, as well as a required scale.
+    - Ideally, this will be used to establish the scale of the output depth map.
+*** what we won't have
+    - accurate camera intrinsics (distortion) or external parameters (camera's relative pose)
+      
+** Output
+*** Real-world coordinates
+    - for each pixel relative to the first camera's reference frame
+
+** Acceptance Criteria
+*** Accuracy within 30 cm (~ one foot) for any visible object in the image
+    - Maximum distance for this accuracy measurment will be to the last visible pyramid in the image.
+*** Reasonable accuracy for other (probably non-historical) images from a test dataset
+
+* Similar Work
+** Refining camera parameters using parallel lines
+*** fSpy
+**** I/O
+     - Takes in user-inputted set of pairs of parallel lines in the image, which should be perpendicular
+     - Outputs a focal length estimation
+**** why we can't use it
+     - Requires the structure of the scene to have ample perpendicular lines. While this is typical of a cityscape, this isn't exactly the case for our gravesite photo.
+     - Only does the work of refining focal length estimates, we would still need to build the rest of the pipeline.
+*** Camera calibration technique from Traffic Analysis From Video (Autor Prace)
+**** I/O
+     - Takes in video frames from traffic cam
+     - Uses parallel lines produced by moving traffic to find the vanishing points and then the focal length.
+**** why we can't use it
+     - While we do have multiple frames and can draw motion vectors between matching features in each frame, our left and right cameras are likely rotated so the lines between features will likely not be parallel
+
+** existing Structure from motion pipelines
+
+* Modelling The Problem
+** the camera
+** resolving undefined depth using structure from motion
+** how existing tools use these tools to build their pipelines
+
+* Our Pipeline
+
+* Testing
+
+* Conclusions
+** review our design
+** why we will meet our AC
+*** our pipeline accounts for possible error in our input sources
+*** our tests allow us to tune our hyperparameters
+
+* Sources
+   

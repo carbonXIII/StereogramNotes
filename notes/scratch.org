@@ -1,0 +1,20 @@
+what we want
+- inputs, outputs, AC
+similar work
+- just general overviews of their inputs and outputs
+- how their problems don't exactly match ours
+modelling the problem
+- how does a camera work
+- structure from motion
+- how the existing solutions use these tools to build their pipelines
+getting from what we have to what we want
+- our pipeline
+- details about each part of it
+- concrete design specification
+  - overview of our final design and the hyperparams we ended up with
+making sure we meet our AC
+- we need an objective measurement in order to tune our hyperparams
+conclusion
+- a quick overview of our design
+- why will it meet AC
+- how it differs from existing solutions
