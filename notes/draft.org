@@ -40,7 +40,22 @@
 **** why we can't use it
      - While we do have multiple frames and can draw motion vectors between matching features in each frame, our left and right cameras are likely rotated so the lines between features will likely not be parallel
 
-** TODO existing Structure from motion pipelines
+** TODO existing Structure from motion pipelines and libraries
+   Many tools exist to perform the different parts of the SfM pipeline, but pre-made solutions are made to solve slightly different problems (many video frames, little noise, no distortion)
+*** OpenMVG
+**** features
+     OpenMVG provides tools for multiple view geometry calculations, including structure from motion and PnP.
+**** issues
+     Only provides C++ bindings, so we would need to provide our own.
+*** OpenCV
+**** features
+     OpenCV does not provide many features specifically related to epipolar geometry, but it does provide the tools we need to build most of the parts of the pipeline.
+     OpenCV also has Python bindings, allowing us to avoid wrapping / distributing native binaries ourselves.
+**** issues
+     Doesn't provide a method for performing bundle adjustment
+*** scipy
+**** features
+     While not built specifically for computer vision, scipy provides useful functions for optimization, that we can use to implement bundle adjustment or the 8-point algorithm.
 
 * Modelling The Problem
 ** the camera
@@ -99,6 +114,7 @@
     - the geometry of a 2 camera setup is known as epipolar geometry, and the general problem of resolving depth / location information using 2 or more camera frames (maybe a video, maybe a stereo setup like we have) is known as structure from motion
    
 ** how existing tools use this math to build their pipelines
+*** 
 
 * Our Pipeline
 
@@ -111,4 +127,6 @@
 *** our tests allow us to tune our hyperparameters
 
 * Sources
-   
+** https://fspy.io/basics/
+** http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&zoom=100,130,908
+
