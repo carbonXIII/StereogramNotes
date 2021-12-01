@@ -40,7 +40,7 @@
 **** why we can't use it
      - While we do have multiple frames and can draw motion vectors between matching features in each frame, our left and right cameras are likely rotated so the lines between features will likely not be parallel
 
-** TODO existing Structure from motion pipelines and libraries
+** existing Structure from motion pipelines and libraries
    Many tools exist to perform the different parts of the SfM pipeline, but pre-made solutions are made to solve slightly different problems (many video frames, little noise, no distortion)
 *** OpenMVG
 **** features
@@ -91,9 +91,9 @@
     - it is important to introduce a new coordinate system so that we can describe more types of transformations
 *** TODO projection matrix 
     - allows us to represent the projection part of the transformation from 3D coordinates to 2D homogenous coordinates
-*** TODO adding pose information
+*** TODO adding pose information [0/1] [0%]
     - the extrinsic parameters of the camera may include some rotation and translation mapping from some 3D coordinate system (e.g. the reference coords of the left camera) to the current camera's coordiante system (e.g. the coordinate system of the right camera)
-    - by default our projection matrix includes no rotation and no translation, so we can write it like this [TODO]
+    - [ ] TODO: by default our projection matrix includes no rotation and no translation, so we can write it like this
     - we can incorporate some rotation, R, and translation vector, T, like this
     - note that because of the ordering of matrix operations this is the rotation and translation of the points, not the camera. the corresponding camera pose would be R^T and -R ^ T \cdot T
    
@@ -112,16 +112,55 @@
 *** TODO depth with 2 cameras
     - with a pair of cameras, we can use the extra information provided by the second camera to resolve this issue of depth, provided we know the relative pose of the other camera, and that we can identify the same point in both images
     - the geometry of a 2 camera setup is known as epipolar geometry, and the general problem of resolving depth / location information using 2 or more camera frames (maybe a video, maybe a stereo setup like we have) is known as structure from motion
+**** TODO estimating external params
+***** essential and fundamental matrices
+***** doing a better job with bundle adjustment
+**** TODO rectification
+**** TODO finding disparity in our rectified image
+***** stereo block matching
+***** dealing with untextured areas
    
 ** how existing tools use this math to build their pipelines
-*** 
+*** camera parameters from vanishing points
+**** fSpy
+***** identifiying lines
+     - based on the geometry of the image, the user inputs 2 pairs of parallel lines, where each set should be perpendicular in 3D space
+     - this step can technically be automated using Hough lines and guessing perpendicular lines, but knowledge of the objects in the image can allow the user to avoid errors that this blind process might make
+***** vanishing points
+     - for each pair of parallel lines, we can find the vanishing points (their intersections in image space).
+     - using the inverse projection matrix this vanishing points could be resolved into 3D directions from the origin of the camera space
+***** solving for camera intrinsic parameters
+     - as we know the pairs of parallel lines are perpendicular to each other, we know that the corresponding directions in camera space should be perpendicular
+     - their dot product should therefore be equal to 0
+     - we can use this to setup a linear system of equations, our variables derived from the parts of the camera intrinsic matrix, and our coefficients derived from the coordinates of the vanishing points
+     - the camera intrinsic matrix has 3 degrees of freedom (if assume zero skewness and square pixels), so we need 3 pairs of points to fully define this
+**** traffic analysis
+     - the calibration in this paper works similarly to fSpy
+***** diamond space
+      - special dual space for lines that allows them to easily find the most common intersection of a set of lines by finding the global maximum
+***** first vanishing point
+     - they assume their video frames will have cars moving in parallel lines, following the lanes
+     - they first filter only moving features in the video, and then match the features between frames to find several motion vectors throughout the video
+     - they then (using diamond space) find the first vanishing point
+***** second vanishing point
+     - again using features from moving cars in the video frame, they find edges along the cars that remain parallel as the car moves
+     - these edges should be perpendicular to the edges from the first vanishing point
+***** solving for camera intrinsic parameters and the the third vanishing point
+      - by assuming the principal point of the camera is at the center of the image, they can solve the linear equations for the focal length and the third vanishing point
+**** issues
+***** scene geometry
+     - our scene doesn't have good geometry for the extraction of vanishing points
+     - even the "motion" vectors between our camera frames will likely not be parallel as the cameras are likely relatively rotated
+***** distortion
+     - this process doesn't work for images with significant distortion, and it is unclear whether or not the cameras that took our target images would satisfy this constraint
+     - if we try to account for distortion in this process, it would no longer by a linear system of equations 
 
-* Our Pipeline
+* TODO Our Pipeline
 
-* Testing
+* TODO Testing
 
 * Conclusions
-** review our design
+** TODO review our design
 ** why we will meet our AC
 *** our pipeline accounts for possible error in our input sources
 *** our tests allow us to tune our hyperparameters
@@ -129,4 +168,5 @@
 * Sources
 ** https://fspy.io/basics/
 ** http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&zoom=100,130,908
+** https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf
 
