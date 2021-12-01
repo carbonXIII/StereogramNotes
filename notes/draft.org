@@ -78,8 +78,8 @@
     - allows us to represent the projection part of the transformation from 3D coordinates to 2D homogenous coordinates
 *** TODO adding pose information
     - the extrinsic parameters of the camera may include some rotation and translation mapping from some 3D coordinate system (e.g. the reference coords of the left camera) to the current camera's coordiante system (e.g. the coordinate system of the right camera)
-    - by default our projection matrix includes no rotation and no translation, so we can write it like this [TODO]
-    - we can incorporate some rotation, R, and translation vector, T, like this
+    - by default our projection matrix includes no rotation and no translation, so we can write it as: P = K [ I 0 ]
+    - we can incorporate some rotation, R, and translation vector, T, as: P = K [ R T ]
     - note that because of the ordering of matrix operations this is the rotation and translation of the points, not the camera. the corresponding camera pose would be R^T and -R ^ T \cdot T
    
 ** resolving undefined depth using structure from motion
@@ -88,7 +88,7 @@
   - using this information, if we know the size of an object (at the angle it is being viewed by the camera), and the focal length, we can determine the size of the object
     - however in cases where we don't have this information (such as when we don't have the object's measurements), we won't be able to determine the depth with the information provided by a single camera
 **** PnP
-    - in cases where we know an objects exact dimensions, there are a few methods we can use to determine it's pose to the camera
+    - in cases where we know an objects exact dimensions, there are a few methods we can use to determine it's relative pose to the camera
 ***** pose from pairs of parallel lines
       - in cases where the objects geometry is simple, we can [insert stuff about normal of plane from vanishing points]
 ***** TODO pose in the general case
@@ -97,7 +97,7 @@
 *** TODO depth with 2 cameras
     - with a pair of cameras, we can use the extra information provided by the second camera to resolve this issue of depth, provided we know the relative pose of the other camera, and that we can identify the same point in both images
     - the geometry of a 2 camera setup is known as epipolar geometry, and the general problem of resolving depth / location information using 2 or more camera frames (maybe a video, maybe a stereo setup like we have) is known as structure from motion
-   
+  
 ** how existing tools use this math to build their pipelines
 
 * Our Pipeline
