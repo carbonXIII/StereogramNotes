@@ -130,7 +130,7 @@
     - this transformation might include translation, so a matrix including this camera pose information would need to map from 3D homogenous world coordinates to 2D homogenous image coordinates
     - [ ] needs math: typically, this pose information might be represented as a rotation matrix and translation vector for the camera's refence system relative to world coordinates. this means we need to apply the inverse of these operations to map the points from world coordinates to camera coordinates.
     - by default our projection matrix includes no rotation and no translation, so we can write it as: P = K [ I 0 ]
-    - we can incorporate some rotation, R_p, and translation vector, T_p, as: P = K [ R_p T_p ]
+    - we can incorporate some rotation, R_p, and a translation vector, T_p, as: P = K [ R_p T_p ]
    
 ** resolving undefined depth using structure from motion
 *** depth with a single camera
@@ -139,7 +139,7 @@
     - however in cases where we don't have this information (such as when we don't have the object's measurements), we won't be able to determine the depth with the information provided by a single camera
 **** PnP
     - in cases where we know an objects exact dimensions, there are a few methods we can use to determine it's relative pose to the camera
-***** pose from pairs of parallel lines
+***** TODO pose from pairs of parallel lines
       - in cases where the objects geometry is simple, we can [insert stuff about normal of plane from vanishing points]
 ***** TODO pose in the general case
       - insert stuff about perspective-n-points
