@@ -1,156 +1,408 @@
+#+OPTIONS: toc:nil
+#+LATEX_HEADER: \usepackage[parfill]{parskip}
+#+LATEX_HEADER: \usepackage[margin=1in]{geometry}
+#+LATEX_HEADER: \usepackage{helvet}
+#+LATEX_HEADER: \renewcommand{\familydefault}{\sfdefault}
+
 * Technical Objectives
-** Input
-*** focal length
-    - From the focal length estimator, we expect to recieve a rough estimate of the focal length.
-    - This estimate is expected to have some error, so further refinement might be required to achieve a useful depth estimate.
-*** stereograms
-    - Pair of input images.
-    - As these are scans of historical photos, these are expected to be quite noisy.
-    - The position of the photo centers is also expected to vary between the 2 images.
-    - The images in this case are not cropped, so there will be additional noise around the edges.
-    - These images might have some degree of additional distortion, which we will not know ahead of time.
-*** additional ground truth data
-    - This data will provide a pair of points in one of the images, as well as a required scale.
-    - Ideally, this will be used to establish the scale of the output depth map.
-*** what we won't have
-    - accurate camera intrinsics (distortion) or external parameters (camera's relative pose)
+** Input :ignore:
+*** stereograms [0/1] [0%]                                           :ignore:
+    \\
+    - [ ] TODO: add the gravesite image here
+    The primary input is the pair of input images, forming a stereogram.
+    As these are scans of historical photos, these are expected to be quite noisy.
+    In our case, our target historical photo is an image depicting a gravesite with a few pyramids.
+    The position of the photo centers is also expected to vary between the two images.
+    The images in this case are not cropped, so there will be additional noise around the edges.
+    These images might have some degree of additional distortion, which we will not know ahead of time.
+*** focal length :ignore:
+    \\
+    From the focal length estimator, we expect to recieve a rough estimate of the focal length.
+    This estimate is expected to have some error, so further refinement might be required to achieve a useful depth estimate.
+*** additional ground truth data :ignore:
+    \\
+    The user will also need to specify some ground truth data for the image.
+    This data will provide a pair of points in one of the images, as well as a required scale.
+    In the case of our target historical photos, this will likely be the length of the pyramid's base.
+    Ideally, this will be used to establish the scale of the output depth map.
+*** what we won't have :ignore:
+    We don't expect to have accurate camera intrinsics.
+    For instance, parameters such as distortion will need to be estimated in case they are not negligible. 
+
+    Additionally, we won't have extrinsic parameters for our cameras.
+    In other words, we won't know the relative rotation and translation of the right camera from the left.
+    We may need to come up with some method of estimating this.
       
-** Output
-*** Real-world coordinates
-    - for each pixel relative to the first camera's reference frame
+** Output :ignore:
+*** Real-world coordinates :ignore:
+    \\
+    The primary output of the depth estimation algorithm will be the 3D world coordinates for each pixel.
+    This will likely be relative to one of the camera's reference frames, but we should be able to transform these coordinates to be relative to a landmark in the image, such as the base of a pyramid.
 
-** Acceptance Criteria
-*** Accuracy within 30 cm (~ one foot) for any visible object in the image
-    - Maximum distance for this accuracy measurment will be to the last visible pyramid in the image.
-*** Reasonable accuracy for other (probably non-historical) images from a test dataset
+** Acceptance Criteria :ignore:
+   \\
+   Our acceptance criteria will be based on experimental accuracy from a test data set, within some reasonable distance to the camera.
+*** Accuracy within 30 cm (~ one foot) for any visible object in the image :ignore:
+    We expect the accuracy of depth information to be within one foot of reality for any object visible in the image, provided that the furthest object is as close as the last visible pyramid in the image.
+*** Expected accuracy based on test data set :ignore:
+    \\
+    Since we don't have ground-truth data for the historical image, we will need to base this estimate on accuracy for a test data set.
+    For the test data set, we can estimate the expected percentage of error for depth estimates provided by this algorithm by comparing to ground truth test data.
+    We will then assume this expected accuracy is probably accurate to our target historical stereogram.
 
-* Related Work
-** Refining camera parameters using parallel lines
-*** fSpy
-**** I/O
-     - Takes in user-inputted set of pairs of parallel lines in the image, which should be perpendicular
-     - Outputs a focal length estimation
-**** why we can't use it
-     - Requires the structure of the scene to have ample perpendicular lines. While this is typical of a cityscape, this isn't exactly the case for our gravesite photo.
-     - Only does the work of refining focal length estimates, we would still need to build the rest of the pipeline.
-*** Camera calibration technique from Traffic Analysis From Video (Autor Prace)
-**** I/O
-     - Takes in video frames from traffic cam
-     - Uses parallel lines produced by moving traffic to find the vanishing points and then the focal length.
-**** why we can't use it
-     - While we do have multiple frames and can draw motion vectors between matching features in each frame, our left and right cameras are likely rotated so the lines between features will likely not be parallel
-
-** existing Structure from motion pipelines and libraries
-   Many tools exist to perform the different parts of the SfM pipeline, but pre-made solutions are made to solve slightly different problems (many video frames, little noise, no distortion)
-*** OpenMVG
-**** features
-     OpenMVG provides tools for multiple view geometry calculations, including structure from motion and PnP.
-**** issues
-     Only provides C++ bindings, so we would need to provide our own.
-*** OpenCV
-**** features
-     OpenCV does not provide many features specifically related to epipolar geometry, but it does provide the tools we need to build most of the parts of the pipeline.
-     OpenCV also has Python bindings, allowing us to avoid wrapping / distributing native binaries ourselves.
-**** issues
-     Doesn't provide a method for performing bundle adjustment
-*** scipy
-**** features
-     While not built specifically for computer vision, scipy provides useful functions for optimization, that we can use to implement bundle adjustment or the 8-point algorithm.
-
-* Modelling The Problem
-** the camera
-   - In order to understand our problem, we need a good model for the camera
-*** pinhole camera model
-**** pinhole
-     - origin of the camera's coordinate system
-**** aperture
-     - the place our image will be projected, "image space"
-     - focal length: distance from the pinhole / origin to the aperature
-**** optical axis:
-     - line normal to the aperture passing through the origin
-**** principal point:
-     - the intersection point of the optical axis and the aperture
-     - the projection of the pinhole / origin in image space
-*** pinhole camera model approximates real cameras
-    - real camera's use lenses, and lenses don't necessarily have fixed focal length
-**** distortion
-     - caused by variations in lens's focal length
-     - radial distortion (pinchusion, barrel): results in variation in focal length as we move away from the center of the lens
-     - if distortion is significant, we will need to account for it before we can get accurate measurements
-*** getting from some 3D coordinate system to image space
-**** extrinsic properties / pose
-     - some coordinate space to camera coordinate space
-     - useful to describe rotation between our 2 cameras
-**** intrinsic properties / projection
-     - describe the center of the camera and focal length
-     - projects from our camera's reference coordinate system to images space
-
-** mathematical model
-   - at this point we need a way to describe our camara's parameters using math
-*** homogenous coordinates
-    - it is important to introduce a new coordinate system so that we can describe more types of transformations
-**** basics in 2D
-     - coordinates in cartesian coordinates can be represented as <x, y> the distance along the axis from the origin
-     - the same point can be written in homogenous coordinates as <xZ, yZ, Z>, where Z is a non-zero real number
-     - Z acts as a normalization factor: scaling our entire vector by any non-zero scaling factor will yield the same point
-     - convert back to cartesian coordinates by dividing by the normalization factor
-***** points at infinity
-      - if our normalization factor is zero, our point can't represent a point with finite coordinates
-      - a vector of the form <x, y, 0> represents a point in the direction <x, y> infinitely far from the origin
-      - in higher dimensions, a normalization factor at 0 yields lines and planes at infinity
-***** lines
-      - lines are described using the same format as points
-      - if a point, p, is on a line l, p \cdot l = 0
-      - if p = <xz, yz, z> and l = <a, b, c>, then xza + bzy + cz = 0.
-      - solving for y/z we get: y = -(x/z) * a/b - c/b
-      - the slope of lines of this form is -a/b, and the y-intercept is -c/b
-****** intersection of lines [0/1] [0%]
-      - the intersection of 2 lines is the cross product
-      - [ ] needs example: if our lines are parallel, this intersection will be a point at infinity in the direction of the lines
-***** transformations [0/1] [0%]
-      - transformations in homogenous coordinates are modelled as matrices, just like with cartesian coordinates
-      - as homogenous coordinates add a normalization factor, these matrices have additional degrees of freedom and can represent more types of transformations
-      - the most general form of transformation allowed by homogenous transformation matrices is projection
-      - [ ] needs example: a projection matrix can be broken down into several key components
-****** breaking parallelism
-      - the additonal degrees of freedom in a projection matrix allow us to break parallelism
-      - parallelism ensures that parallel lines before a transformation remain parallel after it
-      - if we needed to enforce parallelism, we would be unable to show non-orthographic perspectives
-*** projection matrix [0/3] [0%]
-    - with projection matrices we can map from 3D coordinates to the camera's image space
-    - the most basic building block of the projection matrix in the pinhole camera model is the camera intrinsic matrix, K
-    - K maps from 3D directions in our camera's reference space in cartesian coordinates, to 2D homogeneous coordinates in image space
-    - note that K will not capture any information about the position of our camera in world coordinates, it assumes that the vectors it transform are from the camera's origin to a point in 3D space
-    - [ ] needs math: from our understanding of the pinhole camera model, it preserves the following ratios
-    - [ ] needs math: we can rewrite this to solve for our image coordinates
-    - [ ] needs math: in cartesian coordinates, this is not a linear transformation. we need to divide by z to get the intended result. however we can rewrite this as a projection in homogeneous coordinates
-    - if f_x = f_y, the image has square pixels. this is a useful assumption that might simplify the problem of solving for K.
-*** adding pose information [0/1] [0%]
-    - the intrinsic projection matrix does not include a mapping from world coordinates to camera coordinates
-    - this transformation might include translation, so a matrix including this camera pose information would need to map from 3D homogenous world coordinates to 2D homogenous image coordinates
-    - [ ] needs math: typically, this pose information might be represented as a rotation matrix and translation vector for the camera's refence system relative to world coordinates. this means we need to apply the inverse of these operations to map the points from world coordinates to camera coordinates.
-    - by default our projection matrix includes no rotation and no translation, so we can write it as: P = K [ I 0 ]
-    - we can incorporate some rotation, R_p, and a translation vector, T_p, as: P = K [ R_p T_p ]
+* Related Work [0/1] [0%]
+  - [ ] add a source and definition for structure from motion
+  Our problem is a variant of structure from motion.
+  We have multiple frames, between which some objects have moved relative to the camera.
+  What makes our problem unique is that we don't have the intrinsic or extrinsic parameters of the camera, and we only have 2 images to work with.
+  
+** Refining camera parameters using parallel lines :ignore:
+   A few solutions already exist that attempt to find camera parameters based on the structure of an image.
    
-** resolving undefined depth using structure from motion
-*** depth with a single camera
-  - looking at the model we have so far, we can see that depth has the effect of moving our points towards the principal point in image space
-  - using this information, if we know the size of an object (at the angle it is being viewed by the camera), and the focal length, we can determine the size of the object
-    - however in cases where we don't have this information (such as when we don't have the object's measurements), we won't be able to determine the depth with the information provided by a single camera
-**** PnP
-    - in cases where we know an objects exact dimensions, there are a few methods we can use to determine it's relative pose to the camera
-***** TODO pose from pairs of parallel lines
-      - in cases where the objects geometry is simple, we can [insert stuff about normal of plane from vanishing points]
-***** TODO pose in the general case
-      - insert stuff about perspective-n-points
+*** fSpy :ignore:
+    \\
+    fSpy is a tool for finding camera focal length [[[ fspy ]]].
+**** I/O :ignore:
+     It takes in a user-inputted set of pairs of parallel lines in the image, which should be perpendicular.
+     Given enough of these pairs, it is able to determine the focal length.
+**** why we can't use it :ignore:
+     However, fSpy relies on the scene having enough good perpendicular lines to find the focal length.
+     While this is typical of a cityscape, this isn't exactly the case for our target historical photo.
+     Additionally, this method doesn't account for distortion, so we would need some way of un-distorting our photo before considering this method.
+*** Camera calibration technique from Traffic Analysis From Video (Jakub Sochor) :ignore:
+    \\
+**** I/O :ignore:
+     The camera calibration system in [[[sochor]]] is built for video frames taken by traffic cameras.
+     Similar to [[[fspy]]] it uses parallel lines to solve for camera parameters.
+     However, it uses motion of cars between frames as one set of parallel lines.
+**** why we can't use it                                             :ignore:
+     If our cameras had the same rotation and the only motion between our left and right frames was translation, we might be able to use the same method to extract lines.
+     However, our camera setup likely includes some rotation between the camera frames, so the motion of objects would no longer be parallel.
+     This method also relies on undistorted frames.
+
+** existing Structure from motion pipelines and libraries :ignore:
+   \\
+   Many tools and libraries exist to perform the different parts of the structure from motion pipeline.
+   However, most pre-made solutions are made to solve the problem with slightly different constraints (e.g. many frames, little noise, negligible distortion).
+   As this is the case, we will be using general purpose computer vision libraries which provide the tools we need to setup our own pipeline.
+   
+*** OpenMVG :ignore:
+    \\
+    One solid choice of library is OpenMVG [[[openmvg]]].
+**** features :ignore:
+     OpenMVG provides tools for multiple view geometry calculations, including methods for structure from motion and PnP (perspective-n-points is a related problem for finding camera pose relative to a camera of known dimensions).
+**** issues :ignore:
+     The only issue is that OpenMVG does not provide Python bindings, which means we would need to write our own wrapper in order to use it for this project.
+*** OpenCV :ignore:
+    \\
+    OpenCV [[[opencv]]] is a mature general purpose computer vision library.
+**** features :ignore:
+     While OpenCV does not provide many features specifically related to structure from motion, it does provide many of the tools we need to build most of the parts of our pipeline.
+     OpenCV also has Python bindings, allowing us to avoid wrapping / distributing native binaries ourselves.
+**** issues :ignore:
+     The only downside is that OpenCV doesn't provide specific methods for structure from motion, such as bundle adjustment, so we will need to compose these ourselves from other more basic computer-vision building blocks.
+*** additional libraries                                             :ignore:
+    \\
+    In addition to a computer vision library, we will also use a combination of a few math libraries.
+    Numpy [[[numpy]]] provides tools for linear algebra and other mathematical operations.
+    SciPy [[[scipy]]] provides a least-squares optimizer which will be useful for implementing some methods that OpenCV does not provide.
+
+* Modeling The Problem
+  Now that we have a basic understanding of the tools we are working with, we can start analyzing the problem.
+** the camera :ignore:
+   \\
+   We will start by defining a good model for the camera.
+*** pinhole camera model :ignore:
+    [[[camera model notes]]] describes a simplified model of the camera, known as the pinhole camera model.
+    This model is made up of a few important parts.
+    
+**** pinhole :ignore:
+     \\
+     In a pinhole camera, the light from our scene is directed through a "pinhole" and exposed on the other side.
+     Optimally, this pinhole would be a single point, but in a physical camera this would be impossible.
+     In a normal camera, this would be the focal point of the lens, where all the incoming light beams intersect.
+     We will use this as the origin of the camera's reference coordinate system.
+     
+**** aperture :ignore:
+     \\
+     The plane where our image will be projected is known as the aperture.
+     We will call the 2D coordinates mapping the intersection of light and the aperture "image space".
+     When we are dealing with a digital image, the units of these coordinates is often measured in pixels.
+     
+     The focal length of the camera is the distance from the pinhole to this aperture.
+     It is useful for the focal length to share the units of the image space coordinates, so we will use pixels.
+     
+**** optical axis :ignore:
+     \\
+     The line normal to the aperture passing through the origin of the camera is the optical axis.
+     The intersection of the optical axis and the aperture is called the principal point.
+     Another way to see the principal point is the projection of the origin in image space.
+     
+*** pinhole camera model approximates real cameras :ignore:
+    \\
+    As we mentioned before, creating a useful pinhole camera is difficult, as we would like the pinhole to be a single point, which is impossible with a physical camera.
+    In order to make re-focusing the light on a single point possible, most cameras use lenses instead.
+**** distortion [0/1] [0%]                                           :ignore:
+     - [ ] show examples of radial (pincushion, barrel) distortion
+     These lenses don't necessarily have fixed focal length throughout, possibly due to errors in manufacturing.
+     These variations in focal length cause distortion.
+     The most common form of distortion is radial distortion, where the focal length of varies as we move away from the center of the lens.
+     If the distortion is significant, we will need to account for it before we can get accurate measurements.
+*** getting from some 3D coordinate system to image space :ignore:
+    \\
+    Now that we have a reasonable model of the camera, it is important to understand how points in 3D world coordinates are projected to 2D image space.
+    This transformation can be split into 2 main steps each defined by a set of parameters.
+    
+**** extrinsic properties / pose :ignore:
+     The extrinsic parameters of the camera encode the pose information, including the rotation and translation of the camera in world coordinates.
+     This especially important if you have multiple cameras, like we do in our stereogram setup.
+     For instance, we can use the left camera's reference frame as our world coordinates, making the pose of the right camera relative to the first camera.
+**** intrinsic properties / projection :ignore:
+     The intrinsic parameters describe the projection from 3D coordinates in our camera's reference system to image space.
+     These parameters include the center of our image and the focal length.
+
+** mathematical model :ignore:
+   \\
+   Now that we have a basic understanding of the camera model, we need a way to represent these transformations using linear operations.
+   
+*** homogeneous coordinates :ignore:
+    [[[homogeneous coords notes]]] describes a new coordinate system that we can use to describe the type of transformation we need: homogeneous coordinates.
+**** basics in 2D [0/1] [0%]                                         :ignore:
+     - [ ] math for normalization
+     We will focus on the 2D case for the purpose of example, but the ideas represented here can easily be extended to 3D.
+     A point in Cartesian coordinates can be represented as a vector $[x y]$, the distance along the coordinate axes from the origin.
+     The same point can be written in homogeneous coordinates as a vector $[xZ yZ Z]$, where $Z$ is a non-zero real number.
+     Z acts as a normalization factor: scaling our entire vector by any non-zero scaling factor will yield the same point.
+     
+***** points at infinity :ignore:
+      \\
+      If our normalization factor is zero, our point in homogeneous coordinates no longer maps back to a finite point in Cartesian coordinates.
+      A vector of the form $[x y 0]$ represents a point in the direction $[x y]$ infinitely far from the origin.
+      In higher dimensions, a normalization factor at 0 yields lines and planes at infinity.
+***** lines [0/1] [0%]                                               :ignore:
+      \\
+      Lines are described using the same format as points.
+      Given a line described by vector $\lambda = [a \ b \ c]$, and a point described by vector $p = [xZ \ yZ \ Z]$, if $\lambda \cdot p = 0$ the point p is on line \lambda. 
+      If a point, p, is on a line l, p \cdot l = 0.
       
-*** TODO depth with 2 cameras
-    - with a pair of cameras, we can use the extra information provided by the second camera to resolve this issue of depth, provided we know the relative pose of the other camera, and that we can identify the same point in both images
-    - the geometry of a 2 camera setup is known as epipolar geometry, and the general problem of resolving depth / location information using 2 or more camera frames (maybe a video, maybe a stereo setup like we have) is known as structure from motion
-**** TODO estimating external params
-***** essential and fundamental matrices
-***** doing a better job with bundle adjustment
-**** TODO rectification
+      - [ ] dot product to line equation
+
+      \\
+      This equation is the equation of a line.
+      The slope of lines of the form $[a \ b \ c]$ is $-a/b$, and the y-intercept is at $-c/b$.
+      Lines are also invariant to scaling operations, so $\lambda \propto s \lambda$.
+      
+****** intersection of lines [0/2] [0%]                              :ignore:
+      \\
+      The intersection of 2 lines is the cross product.
+      
+      - [ ] show the math
+
+      If our lines are parallel, this intersection will be a point at infinity in the direction of the lines.
+
+      - [ ] show the math
+        
+***** transformations [0/1] [0%]                                     :ignore:
+      \\
+      Linear transformations in homogeneous coordinates can be modeled as matrices, just like with Cartesian coordinates.
+      As homogeneous coordinates add a normalization factor, these matrices have additional degrees of freedom and can represent more types of transformations.
+      The most general form of transformation allowed by homogeneous transformation matrices is projection.
+
+      A projection matrix can be broken down into a few key components:
+      
+      - [ ] show math [A T, b s]
+
+      In the breakdown above, $A$ would be 2x2 matrix.
+      This matrix can be seen as a transformation in Cartesian coordinates, potentially including scaling or rotation.
+      
+      $T$ can be seen as a translation vector, a fixed value that will be added to each coordinate after the transformation represented by A is applied.
+      
+      $s$ is a normalization factor.
+      Our vectors will be scaled down by this factor after the other operations have been applied.
+
+      $b$ is a skew vector.
+      It allows us to break parallelism, lines that are parallel before our transformation no longer need to be parallel after.
+      Breaking parallelism allows us to project images with non-orthographic perspectives.
+      
+*** camera intrinsic matrix [0/3] [0%]                        :ignore:
+    \\
+    With homogeneous coordinates and projection matrices we can now map from 3D coordinates to the camera's image space using a linear transformation.
+    The most basic building block of the projection matrix in the pinhole camera model is the camera intrinsic matrix, $K$.
+    $K$ maps from 3D directions in our camera's reference space in Cartesian coordinates, to 2D homogeneous coordinates in image space.
+    Note that $K$ will not capture any information about the position of our camera in world coordinates, it assumes that the vectors it transform are from the camera's origin to a point in 3D space.
+
+    From our understanding of the pinhole camera model, it preserves the following ratios (keeping Cartesian coordinates for now):
+
+    - [ ] needs diagram and some math detailing u/f = x/z
+
+    We can rewrite this to solve for our image coordinates:
+    
+    - [ ] needs math: we can rewrite this to solve for our image coordinates
+
+    In Cartesian coordinates, this is not a linear transformation. we need to divide by z to get the intended result. however we can rewrite this as a projection in homogeneous coordinates:
+
+    - [ ] needs math
+
+    This matrix $K$ has a few key parts.
+    $[ c_x \ c_y ]$ represent the location of the principal point.
+    $f_x$ and $f_y$ are the focal length of the image along the coordinate axes.
+    If $f_x = f_y$, the image has square pixels.
+    This is a useful assumption that will simplify the problem of solving for $K$.
+
+**** as a mapping from directions to points in image space :ignore:
+     \\
+     As K maps from 3D to 2D coordinates, there has to be some loss of information in the process.
+     As K is a transformation on homographic coordinates, the scale of the input does not affect the output.
+     Therefore, all points in the same direction from the camera's origin are mapped to the same point in image space.
+     K is a bijective mapping between 3D directions and 2D points in image space.
+     
+**** vanishing points :ignore:
+     \\
+     In 3D, the intersection of 2 parallel lines will be a point at infinity in the same direction as those lines.
+     Projecting those lines to image space, we will find that they are no longer parallel (provided they are visible in the image).
+     The intersection of these 2 parallel lines in image space is known as a vanishing point.
+     By inverting K, we can map this vanishing point to a direction in 3D space in the same direction as our lines.
+     This is useful as it allows us to find the angle of a pair of parallel lines in our image.
+     Provided we can find 2 sets of parallel lines that lie on the same plane, we can use this technique to find the normal vector for a plane in our image as well.
+    
+*** adding pose information [0/1] [0%] :ignore:
+    \\
+    The intrinsic projection matrix does not include a mapping from world coordinates to camera coordinates.
+    This transformation might include translation, so a matrix including this camera pose information would need to map from 3D homogeneous world coordinates to 2D homogeneous image coordinates.
+
+    Typically, this pose information would be represented as a rotation matrix and translation vector for the camera's reference system relative to world coordinates.
+    This means we need to apply the inverse of these operations to map the points from world coordinates to camera coordinates: $R_c = R_{p}^{-1}. \ T_c = -R_c T_p$,
+    where $R_c, T_c$ is the camera's pose information, and $R_p, T_p$ is the pose of points in the camera's reference system relative to the points in world coordinates.
+    
+    If our camera is not rotated or translated relative to the camera coordinate system, we can write the final projection matrix as $P = K [I \ 0]$
+    We can incorporate the pose of our points, $R_p, T_p$, as $P = K [ R_p T_p ]$.
+   
+** resolving undefined depth using structure from motion :ignore:
+*** depth with a single camera :ignore:
+    \\
+    Looking at the model we have so far, we can see that as points move away from the camera's origin along the Z axis, their projections move towards the principal point in 3D space.
+    This has the affect of shrinking objects as they move further from the camera, proportional to their distance from the camera.
+    Using this information, if we know the length of an object parallel to the camera plane, as well as the focal length, we can determine the distance of the object to the camera.
+    However in cases where we don't have the necessary information -- such as the object's measurements -- we won't be able to determine the depth with just the information from a single camera.
+**** PnP                                                             :ignore:
+     \\
+     If we don't know an objects rotation relative to the camera, it might be difficult to determine it's length parallel to the camera plane.
+     In cases where we know an object's exact dimensions, there are few methods that we can use to determine it's relative rotation.
+***** pose from pairs of parallel lines                              :ignore:
+      If our object has appropriate structure we can find its rotation by finding vanishing points.
+      This is usually only the case for simple objects.
+***** pose in the general case                                       :ignore:
+      \\
+      In the general case, this class of problems is known as Perspective-n-Points or PnP.
+      OpenCV provides a number of solutions for this problem, as described in [[[3pnp]]] and [[[epnp]]].
+      As input these functions take in a list of 3D points describing features of our object, as well as a list of 2D points specifying the corresponding features in image space.
+      In order to generate a unique solution, these functions need at least 4 points.
+      
+*** depth with 2 cameras                                             :ignore:
+**** triangulation :ignore:
+     \\
+     With 2 or more frames, we can use the extra information provided by the second camera to triangulate points in 3D, provided we know the relative pose of the other camera, and that we can identify the same point in both images.
+     The first step of triangulation would be to use the camera intrinsic matrix to find the directions from each camera to our target point.
+     Using each camera's pose information, we can draw lines passing through the camera's origin in the directions obtained from the previous step.
+     The intersection of these lines should be the location of the point in world coordinates.
+     To account for error, instead of finding the intersection of the lines, we can find the optimal point using least squares optimization.
+
+     This method requires us to find matches using a global matcher, which might result in a larger number of possible false positive matches.
+     If we can constrain our matches based on the geometry of our scene, we might be able to filter out some of these false matches and obtain a better result overall.
+    
+**** epipolar geometry :ignore:
+     \\
+     [[[epipolar notes]]] describes the geometry of a 2 camera setup, or epipolar geometry.
+     In a typical stereogram camera setup, the camera centers are separated by a fixed distance.
+     The segment between the two cameras' centers is known as the /baseline/.
+     The intersection of the baseline with a camera's image plane is known as an /epipole/.
+     If the camera plane and the baseline are parallel, the /epipole/ is a point at infinity, though this is typically not the case.
+
+     For some 3D point $P$ visible in both cameras' images, we can define a few more structures.
+     The /epipolar plane/ is the plane formed by the 2 camera's centers and the point $P$.
+     It is important to notice that this plane contains the baseline and the epipoles.
+     The /epipolar line/ is the intersection of the epipolar plane and a camera plane.
+     For any choice of $P$, this line will still contain the epipoles.
+
+***** the importance of parallel cameras [0/4] [0%]                  :ignore:
+
+      - [ ] insert parallel epipolar diagram
+      
+      If our cameras' image planes are parallel to the baseline, we know the focal length and the baseline, and we have a matching pair of points from each image, we can calculate the depth to that point.
+      Using the diagram above, we can see that $\triangle{PLR}$ and $\triangle{PE_LE_R}$ are similar. We can use the similar triangles in the diagram to find b_l (the distance along the baseline between camera L and our point P):
+
+      - [ ] insert math solving for x coord
+        
+      We can name the value $x_l + x_r$ the disparity $d$.
+      Looking now at similar triangles $\triangle{LL_zP}$ and $\triangle{LL_fE_l}$, we can finally get the depth $z$:
+
+      - [ ] insert math solving for depth from disparity
+
+      As this math depends on our cameras' image planes being parallel to the baseline, we will need to define a transformation to /rectify/ the images of cameras that don't adhere to this constraint.
+     
+**** TODO estimating external params :ignore:
+     If we can find a set of matching points in our images, we can use our points to determine the required transformation to rectify our images.
+     
+***** essential and fundamental matrices [0/3] [0%]                  :ignore:
+      \\
+      First we must introduce the concept of the essential matrix.
+      A 3D point $P$ has corresponding points in the image space of each camera, $p$ and $p'$.
+      If we know $p$ and we want to find $p'$, we know that it must lie on the epipolar line for $P$.
+      To find the epipolar line, we must know the relative position of our cameras defined by rotation matrix $R$ and translation vector $T$ (in our first camera's reference system).
+      We assume for simplicity that our cameras have a focal length of 1 and centers at $\langle 0, 0 \rangle$, so $K = K' = I$.
+      Based on this, the projection of $p'$ on camera 1's image plane is $Rp' + T$.
+
+      We know that $T$ (the translation vector between the cameras) is our baseline, and therefore must be on the epipolar plane.
+      We also know that $Rp' + T$ must also be on the epipolar plane.
+      We can find a vector normal to the epipolar plane using the cross product: $T \times (Rp' + T) = T \times Rp'$.
+      For any point on the plane, the dot product with this normal vector should be 0.
+      We know that $p$ is on the epipolar plane as well, so $p \cdot (T \times Rp')$.
+      For 3D vectors we can rewrite our cross product as matrix multiplication: $p^T (T_{\times} R) p'$.
+      From this we can derive our definition of the essential matrix, $E = T_{\times} R$.
+      For any point in our first image $p$, it's corresponding matching point must lie on the line ($p^T E$).
+      
+      This definition of the essential matrix assumed that $K = K' = I$, so we can factor this back into the equation to get our fundamental matrix: $F = K^{-T} E K'^{-1}$.
+      This new matrix performs the same function as the essential matrix, but for cameras with varying focal length and center.
+      F has a few interesting properties, it only has 8 degrees-of-freedom since its scale doesn't matter, and it has rank 2 since it maps from points to lines.
+    
+      Without knowledge of our camera's intrinsic parameters, we might still be able to find the fundamental matrix assuming we can find a sufficient number of independent epipolar lines.
+      Given 2 matching points in our images, $p = \langle u, v, 1 \rangle$ and $p' = \langle u', v', 1 \rangle$:
+
+      - [ ] eight point algo
+ 
+      With more matches we can build up a matrix $W$ from row vectors $w_i$, such that $Wf=0$.
+      We only need 8 matching points to fully define F (since it only has 8 degrees of freedom), but we can use more to deal with potential noise in our matches, finding F with the smallest mean squared error.
+      Our resulting estimate for F might have rank 3, while the real F has rank 2, but we can fix this using SVD:
+
+      - [ ] correcting F rank
+
+      While using more than 8 matches to estimate F will be more resistant to noise, we might need to employ other methods to deal with outliers in our matches.
+      One strategy is to use RANSAC: select random samples from our set of matches and find the one that produces the least outliers.
+      Another strategy is to find F that minimizes the median of squared error rather than mean squared error.
+
+***** recovering pose from essential matrix :ignore:
+      \\
+      Given the camera intrinsic matrix, $K$, we can recover the essential matrix using our estimate of the fundamental matrix.
+      Alternatively, we can use a similar algorithm, the 5 point algorithm, to solve for the essential matrix directly.
+      Once we have the essential matrix, [[[recover pose]]] describes a method we can use to recover the pose information of our cameras.
+
+***** triangulation :ignore:
+      
+***** doing a better job with bundle adjustment :ignore:
+      \\
+      After we have estimates for our camera's parameters, we can refine them using a process known as bundle adjustment [[[bundle adjustment]]].
+      This process uses the parameters for each camera to triangulate our matched points, and then reproject them back to image space.
+      The sum of distances between the reprojected points and the actual points is known as reprojection error.
+      We can then use a least squares minimizer to minimize this reprojection error.
+      This process finds better estimates for camera's intrinsic parameters (e.g. focal length, distortion) and extrinsic parameters (e.g. pose).
+      However, as the reprojection error function is not linear, the minimizer is not guaranteed to find the best possible solution.
+      In order for bundle adjustment to succeed, we need a reasonable initial estimate for our camera parameters.
+      
+**** rectification :ignore:
+     \\
+     Now that we have camera parameters we can create a transformation to align our image planes with the baseline.
+     [[[rectification]]] describes a method for computing this transformation from the fundamental matrix.
+     
 **** TODO finding disparity in our rectified image
 ***** stereo block matching
 ***** dealing with untextured areas
@@ -159,36 +411,36 @@
 *** camera parameters from vanishing points
 **** fSpy
 ***** identifiying lines
-     - based on the geometry of the image, the user inputs 2 pairs of parallel lines, where each set should be perpendicular in 3D space
-     - this step can technically be automated using Hough lines and guessing perpendicular lines, but knowledge of the objects in the image can allow the user to avoid errors that this blind process might make
+     based on the geometry of the image, the user inputs 2 pairs of parallel lines, where each set should be perpendicular in 3D space
+     this step can technically be automated using Hough lines and guessing perpendicular lines, but knowledge of the objects in the image can allow the user to avoid errors that this blind process might make
 ***** vanishing points
-     - for each pair of parallel lines, we can find the vanishing points (their intersections in image space).
-     - using the inverse projection matrix this vanishing points could be resolved into 3D directions from the origin of the camera space
+     for each pair of parallel lines, we can find the vanishing points (their intersections in image space).
+     using the inverse projection matrix this vanishing points could be resolved into 3D directions from the origin of the camera space
 ***** solving for camera intrinsic parameters
-     - as we know the pairs of parallel lines are perpendicular to each other, we know that the corresponding directions in camera space should be perpendicular
-     - their dot product should therefore be equal to 0
-     - we can use this to setup a linear system of equations, our variables derived from the parts of the camera intrinsic matrix, and our coefficients derived from the coordinates of the vanishing points
-     - the camera intrinsic matrix has 3 degrees of freedom (if assume zero skewness and square pixels), so we need 3 pairs of points to fully define this
+     as we know the pairs of parallel lines are perpendicular to each other, we know that the corresponding directions in camera space should be perpendicular
+     their dot product should therefore be equal to 0
+     we can use this to setup a linear system of equations, our variables derived from the parts of the camera intrinsic matrix, and our coefficients derived from the coordinates of the vanishing points
+     the camera intrinsic matrix has 3 degrees of freedom (if assume zero skewness and square pixels), so we need 3 pairs of points to fully define this
 **** traffic analysis
-     - the calibration in this paper works similarly to fSpy
+     the calibration in this paper works similarly to fSpy
 ***** diamond space
-      - special dual space for lines that allows them to easily find the most common intersection of a set of lines by finding the global maximum
+      special dual space for lines that allows them to easily find the most common intersection of a set of lines by finding the global maximum
 ***** first vanishing point
-     - they assume their video frames will have cars moving in parallel lines, following the lanes
-     - they first filter only moving features in the video, and then match the features between frames to find several motion vectors throughout the video
-     - they then (using diamond space) find the first vanishing point
+     they assume their video frames will have cars moving in parallel lines, following the lanes
+     they first filter only moving features in the video, and then match the features between frames to find several motion vectors throughout the video
+     they then (using diamond space) find the first vanishing point
 ***** second vanishing point
-     - again using features from moving cars in the video frame, they find edges along the cars that remain parallel as the car moves
-     - these edges should be perpendicular to the edges from the first vanishing point
+     again using features from moving cars in the video frame, they find edges along the cars that remain parallel as the car moves
+     these edges should be perpendicular to the edges from the first vanishing point
 ***** solving for camera intrinsic parameters and the the third vanishing point
-      - by assuming the principal point of the camera is at the center of the image, they can solve the linear equations for the focal length and the third vanishing point
+      by assuming the principal point of the camera is at the center of the image, they can solve the linear equations for the focal length and the third vanishing point
 **** issues
 ***** scene geometry
-     - our scene doesn't have good geometry for the extraction of vanishing points
-     - even the "motion" vectors between our camera frames will likely not be parallel as the cameras are likely relatively rotated
+     our scene doesn't have good geometry for the extraction of vanishing points
+     even the "motion" vectors between our camera frames will likely not be parallel as the cameras are likely relatively rotated
 ***** distortion
-     - this process doesn't work for images with significant distortion, and it is unclear whether or not the cameras that took our target images would satisfy this constraint
-     - if we try to account for distortion in this process, it would no longer by a linear system of equations 
+     this process doesn't work for images with significant distortion, and it is unclear whether or not the cameras that took our target images would satisfy this constraint
+     if we try to account for distortion in this process, it would no longer by a linear system of equations 
 
 * TODO Our Pipeline
 
@@ -201,7 +453,17 @@
 *** our tests allow us to tune our hyperparameters
 
 * Sources
-** https://fspy.io/basics/
-** http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&zoom=100,130,908
-** https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf
-
+  1. <<fspy>> https://fspy.io/basics/
+  2. <<sochor>> http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&zoom=100,130,908
+  3. <<openmvg>> http://imagine.enpc.fr/~moulonp/openMVG/
+  4. <<opencv>> https://opencv.org/
+  5. <<numpy>>
+  6. <<scipy>>
+  7. <<camera model notes>> https://web.stanford.edu/class/cs231a/course_notes/01-camera-models.pdf
+  8. <<homogeneous coords notes>> https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf
+  9. <<epipolar notes>> https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf
+  10. <<epnp>> Vincent Lepetit, Francesc Moreno-Noguer, and Pascal Fua. Epnp: An accurate o (n) solution to the pnp problem. International journal of computer vision, 81(2):155–166, 2009.
+  11. <<3pnp>> Xiao-Shan Gao, Xiao-Rong Hou, Jianliang Tang, and Hang-Fei Cheng. Complete solution classification for the perspective-three-point problem. Pattern Analysis and Machine Intelligence, IEEE Transactions on, 25(8):930–943, 2003.
+  12. <<recover pose>> https://www.uio.no/studier/emner/matnat/its/nedlagte-emner/UNIK4690/v16/forelesninger/lecture_7_3-pose-from-epipolar-geometry.pdf
+  13. <<bundle adjustment>> http://lear.inrialpes.fr/pubs/2000/TMHF00/Triggs-va99.pdf
+  14. <<rectification>> http://dev.ipol.im/~morel/Dossier_MVA_2011_Cours_Transparents_Documents/2011_Cours7_Document2_Loop-Zhang-CVPR1999.pdf
