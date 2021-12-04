@@ -10,7 +10,7 @@
 #+LATEX_CLASS_OPTIONS: [12pt]
 
 * Technical Objectives
-** Input :ignore:
+** Inputs
 *** stereograms [0/2] [0%]                                           :ignore:
     \\
 
@@ -44,13 +44,13 @@
     In other words, we won't know the relative rotation and translation of the right camera from the left.
     We may need to come up with some method of estimating this.
 
-** Output :ignore:
+** Output
 *** Real-world coordinates :ignore:
     \\
     The primary output of the depth estimation algorithm will be a dense mapping from image coordinates to 3D world coordinates.
     This will likely be relative to one of the camera's reference frames, but we should be able to transform these coordinates to be relative to a landmark in the image, such as the base of a pyramid.
 
-** Acceptance Criteria :ignore:
+** Acceptance Criteria 
    \\
    Our acceptance criteria will be based on experimental accuracy from a test data set, within some reasonable distance to the camera.
 *** Accuracy within 30 cm (~ one foot) for any visible object in the image :ignore:
@@ -66,7 +66,7 @@
   We have multiple frames, between which some objects have moved relative to the camera.
   What makes our problem unique is that we don't have the intrinsic or extrinsic parameters of the camera, and we only have 2 images to work with.
 
-** Refining camera parameters using parallel lines :ignore:
+** Camera Calibration
    A few solutions already exist that attempt to find camera parameters based on the structure of an image.
 
 *** fSpy :ignore:
@@ -90,7 +90,7 @@
      However, our camera setup likely includes some rotation between the camera frames, so the motion of objects would no longer be parallel.
      This method also relies on undistorted frames.
 
-** existing Structure from motion pipelines and libraries :ignore:
+** Computer Vision Libraries
    \\
    Many tools and libraries exist to perform the different parts of the structure from motion pipeline.
    However, most pre-made solutions are made to solve the problem with slightly different constraints (e.g. many frames, little noise, negligible distortion).
@@ -119,7 +119,7 @@
 
 * Modeling The Problem
   Now that we have a basic understanding of the tools we are working with, we can start analyzing the problem.
-** the camera :ignore:
+** Pinhole Camera Model
    \\
    We will start by defining a good model for the camera.
 *** pinhole camera model :ignore:
@@ -179,7 +179,7 @@
      The intrinsic parameters describe the projection from 3D coordinates in our camera's reference system to image space.
      These parameters include the center of our image and the focal length.
 
-** mathematical model :ignore:
+** The Math of Projection
    \\
    Now that we have a basic understanding of the camera model, we need a way to represent these transformations using linear operations.
 
@@ -487,7 +487,7 @@
     If our camera is not rotated or translated relative to the camera coordinate system, we can write the final projection matrix as $P = K [I \ 0]$
     We can incorporate the pose of our points, $R_p, T_p$, as $P = K [ R_p T_p ]$.
 
-** depth                                                             :ignore:
+** Determining Depth
 *** depth with a single camera :ignore:
     \\
     Looking at the model we have so far, we can see that as points move away from the camera's origin along the Z axis, their projections move towards the principal point in 3D space.
@@ -772,7 +772,7 @@
       Additionally, at the edges of objects, where blocks include parts of the background, the block matcher might also produce inaccurate results, usually resulting in halo around objects known as /speckle/.
       We can deal with speckle and untextured surfaces using smoothing or filtering, but this will often still result in large areas of inaccurate disparity information.
 
-** how existing tools use this math to build their pipelines :ignore:
+** Revisiting Related Work
    \\
    We now have all the necessary parts to build a structure from motion pipeline.
    Before we continue, however, it is useful to review the aforementioned work on camera calibration and structure from motion.
