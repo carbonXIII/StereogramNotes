@@ -368,7 +368,7 @@
   \end{tikzpicture}
 #+end_figure
 
-#+CAPTION: Solving for our image coordinates given details about our camera, using cartesian coordinates. Here the center of the image is $[c_x \ c_y]$.
+#+CAPTION: Solving for our image coordinates given details about our camera, using Cartesian coordinates. Here the center of the image is $[c_x \ c_y]$.
 #+NAME: eq:cart_proj
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
@@ -544,7 +544,7 @@
       In figure [[fig:pll_epipolar]], we can see that $\triangle{PLR}$ and $\triangle{PE_LE_R}$ are similar.
       We can use the similar triangles in the diagram to find b_l (the distance along the baseline between camera L and our point P), as shown in figure [[eq:disparity]].
 
-#+CAPTION: Diagram of an epipolar setup where both cameras image planes are parallel to the baseline. /L/ and /R/ are the left and right cameras. /P/ is some point visible to both cameras. /b_l/ and /b_r/ are the distance along the baseline to P from camera's /L/ and /R/ respectively. /x_l/ and /x_r/ is the distance along the x-axis of each camera to the projection of /P/. /E_L/ and /E_R/ are the endpoints of the epipolar line intersecting the projection line for P. /f/ is fhe focal length, and /z/ is the depth.
+#+CAPTION: Diagram of an epipolar setup where both cameras image planes are parallel to the baseline. /L/ and /R/ are the left and right cameras. /P/ is some point visible to both cameras. /b_l/ and /b_r/ are the distance along the baseline to P from camera's /L/ and /R/ respectively. /x_l/ and /x_r/ is the distance along the x-axis of each camera to the projection of /P/. /E_L/ and /E_R/ are the endpoints of the epipolar line intersecting the projection line for P. /f/ is the focal length, and /z/ is the depth.
 #+NAME: fig:pll_epipolar
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
@@ -628,7 +628,7 @@
       A 3D point $P$ has corresponding points in the image space of each camera, $p$ and $p'$.
       If we know $p$ and we want to find $p'$, we know that it must lie on the epipolar line for $P$.
       To find the epipolar line, we must know the relative position of our cameras defined by rotation matrix $R$ and translation vector $T$ (in our first camera's reference system).
-      We assume for simplicity that our cameras have a focal length of 1 and centers at $\langle 0, 0 \rangle$, so $K = K' = I$.
+      We assume for simplicity that our cameras have a focal length of 1 and centers at $[0 \ 0]$, so $K = K' = I$.
       Based on this, the projection of $p'$ on camera 1's image plane is $Rp' + T$.
 
       We know that $T$ (the translation vector between the cameras) is our baseline, and therefore must be on the epipolar plane.
@@ -786,11 +786,24 @@
       The user needs find the vanishing points corresponding to 3 pair-wise perpendicular directions.
       They can do this by marking sets of parallel lines on the scene.
       fSpy uses these lines to calculate the vanishing points.
-      The dot product of the directions of each pair of vanishing points should be zero, as they are perpendicular:
-      
-      - [ ] linear equation for the dot product of vanishing points
+      The dot product of the directions of each pair of vanishing points should be zero, as they are perpendicular, as shown in figure [[eq:perp_vanish]].
+
+#+CAPTION: Constructing a linear constraint on K from perpendicular vanishing points.
+#+NAME: eq:perp_vanish
+#+ATTR_LATEX: :options [H]
+#+begin_figure latex
+  \begin{center}
+     \[ d_i = K^{-1} p_i \]
+     \[ d_1 \cdot d_2 = 0 \]
+     \[ (K^{-1} p_1)^T (K^{-1} p_2) = 0 \]
+     \[ p_1 (KK^T)^{-1} p_2 = 0 \]
+  \end{center}
+#+end_figure
 
       These constraints form a system of linear equations, where our coefficients are the coordinates of the vanishing points, and our unknowns are the parts of the camera intrinsic matrix.
+      Note that these constraints form a linear constraint not on $K$, but on $(KK^T)^{-1}$.
+      This is fine, however, as we can use Cholesky decomposition to recover K from this value, according to [[[camera model notes]]].
+      
       With 3 points we get 3 equations, but the camera intrinsic matrix can have up to 5 unknowns including the 2 focal length values, the principal point, and skew parameter.
       By assuming our image has zero skew and square pixels, we can reduce the number of unknowns to 3.
 
@@ -823,7 +836,78 @@
      If we try to account for distortion in this process, it would no longer be a linear system of equations.
      Bundle adjustment attempts to solve a similar problem for a non-linear system of equations, but it requires us to have a reasonable initial guess in order to avoid falling into a local minima.
 
+*** useful library functions                                         :ignore:
+    \\
+**** OpenCV :ignore:
+     Our computer vision library of choice will be OpenCV as it a popular and mature computer vision library that provides Python bindings.
+     It includes several high level functions that we can use to build our pipeline.
+     
+**** findEssentialMat :ignore:
+     \\
+     /findEssentialMat()/ estimates the essential matrix using the 5 point algorithm.
+     It requires us to have some initial guess for our camera's intrinsic parameters, including the focal length and the principal point.
+
+     In the presence of outliers in our match info, the 5 point algorithm might generate an inaccurate estimate.
+     To deal with this, OpenCV can use one of 2 methods to filter the input points: /RANSAC/ or /LMEDS/.
+     LMEDS, or least medians, attempts to find the essential matrix minimizing the median of error for all matches.
+     The median is less susceptible to outliers than the mean, and is overall a better representation of the center of the population of our points.
+     RANSAC is a general method for filtering noisy inputs when optimizing linear functions.
+     It works by selecting random samples of the input points, generating an essential matrix using the 5 point algorithm for the sample, and then finding the number of matches from our total that lie within some threshold error from that estimate.
+     In practice, LMEDS appears to be more stable for our use case.
+     
+**** recoverPose :ignore:
+     \\
+     /recoverPose()/ takes in an essential matrix and breaks it down into it's component pose information.
+     It outputs a rotation matrix and a translation vector.
+     The pose corresponding to a particular essential matrix is not unique, and there can be up to 4 different combinations.
+     /recoverPose()/ takes in our set of matching points and uses the pose estimate to triangulate their locations.
+     It then finds the pose in which most of the points are triangulated to be in front of the camera.
+
+**** bundle adjustment :ignore:
+     \\
+     OpenCV does not provide a method for bundle adjustment, but it does provide several methods for us to implement bundle adjustment ourselves.
+     Typically bundle adjustment uses reprojection error as the cost function, minimizing the difference between re-projected triangulated points and the corresponding points in each image.
+     The initial guess for the best possible triangulated points can be found using /triangulatePoints()/ a function that takes in each of our camera's intrinsic matrix and the essential matrix and outputs the triangulated points.
+     This function does not account for distortion, so we will need to call /undistortPoints()/ with our guess for the distortion parameters before we call this function.
+     
+     To reproject these points back to image space, we can use /projectPoints()/ which takes in our camera's parameters and outputs the projected points.
+     Bundle adjustment also requires us to be able to calculate the Jacobian of our cost function, and we could calculate it directly if OpenCV provided a Jacobian for /projectPoints()/.
+     Unfortunately while /projectPoints()/ does output a Jacobian, it does not include the partial derivatives relative to the input set of points, which we would need.
+     Therefore, in order to obtain the Jacobian we will need to estimate using the finite difference method.
+
+     We might also consider using an alternative cost function instead of reprojection error, such as the one described in [[[altbundle]]].
+     This function use our camera intrinsic matrix and pose information to lines in world coordinates.
+     The error is then the minimum distance between these lines.
+     This avoids triangulating our points and then reprojecting them, but still finds a similar cost.
+
+     For the actual bundle adjustment implementation, we need a least square minimizer such as the popular Levenberg-Marquardt algorithm [[[lm]]].
+     Fortunately, SciPy offers a Python implementation: /scipy.optimize.least\under{}squares/.
+     This function can also optionally approximate the Jacobian use the finite difference method for us.
+     It might be useful to consider calculating the Jacobian directly for improved accuracy.
+     
+**** stereoRectify :ignore:
+     \\
+     After we have an accurate estimate for the pose of our camera's we would need to generate a rectification transform.
+     /stereoRectify()/ takes in our camera's parameters and outputs this transformation for each of our cameras.
+     After we have the transformations, we can actually perform the rectification using /warpPerspective()/ a function that transforms an image using a projection matrix.
+     
+**** StereoSGBM :ignore:
+     \\
+     /StereoSGBM/ implements the semi-global block matching algorithm.
+     In addition to the input stereogram, /StereoSGBM/ also includes several hyperparameters we can fine-tune to get a better output disparity map.
+     The function of each parameters is described in [[[sgbm]]].
+     The parameter /numDisparites/ controls the size of the sliding window, i.e. how far to look to the left for a match for each block.
+     The /speckleWindow/, /minDisparity/, and /speckleRange/ parameters control the process that filters out speckles.
+     /Speckle/ is a type of error that can occur along the edge of objects when the sliding window includes foreground and background elements.
+     The process discards matches for pixels where the minimum disparity in the window specified is less than the minimum.
+     Finally, the smoothing parameters /P1/ and /P2/ control how smooth the outputted disparity map should be.
+     This can help fill in holes in the disparity map, at the cost of accuracy.
+
+**** Depth Completion via ml
+
 * TODO Our Pipeline
+  
+  
 * TODO Testing
 * Conclusions
 ** TODO review our design
@@ -849,3 +933,6 @@
   15. <<diamond space>> http://www.fit.vutbr.cz/research/groups/graph/pclines/papers/2013-BMVC-Dubska-VanishingPointsDetection.pdf
   16. <<structure from motion>> https://www.mathworks.com/help/vision/ug/structure-from-motion.html
   17. <<loc>> https://www.loc.gov/pictures/item/2018671309/
+  18. <<sgbm>> https://ww2.mathworks.cn/help/visionhdl/ug/stereoscopic-disparity.html
+  19. <<lm>> J. J. More, “The Levenberg-Marquardt Algorithm: Implementation and Theory,” Numerical Analysis, ed. G. A. Watson, Lecture Notes in Mathematics 630, Springer Verlag, pp. 105-116, 1977.
+  20. <<altbundle>> https://www.asprs.org/a/publications/proceedings/baltimore09/0110.pdf

@@ -144,7 +144,7 @@
      - OpenCV's StereoSGBM only checks in one direction (left-to-right)
 **** speckle (speckleWindow, minDisparity, speckleRange)
      - At the border of objects, when the sliding window includes both the foreground and background, sgbm might start to find in accurate matches between an object and the background
-     - Setting a speckleWindow size, we can filter out matches where some disparities in the window are outside specle range
+     - Setting a speckleWindow size, we can filter out matches where some disparities in the window are outside speckle range
 **** smoothing parameters (P1, P2)
      - Penalties controlling how smooth the output should be (more penalty, more benefit for smoothing out differences in neighborhing pixels)
      -
