@@ -18,14 +18,14 @@
 
     The primary input is the pair of input images, forming a stereogram.
     As these are scans of historical photos, these are expected to be quite noisy.
-    In our case, our target historical photo is an image depicting a gravesite with a few pyramids, shown in figure [[img:stereo]].
+    In our case, our target historical photo is an image depicting a gravesite with a few pyramids, shown in [[fig:stereo]].
     The position of the photo centers is also expected to vary between the two images.
     The images in this case are not cropped, so there will be additional noise around the edges.
     These images might have some degree of additional distortion, which we will not know ahead of time.
 
-    #+caption: Our target historical stereogram, featuring left and right frames taken simultaneously by 2 cameras, available from [[[loc]]].
-    #+name: img:stereo
-    #+attr_latex: :height 200px
+    #+caption: Our target historical stereogram, featuring left and right frames taken simultaneously by 2 cameras. Source cite:loc.
+    #+name: fig:stereo
+    #+attr_latex: :height 200px :placement [H]
     [[file:../data/stereo.png]]
 
 *** focal length :ignore:
@@ -56,16 +56,17 @@
    \\
    Our acceptance criteria will be based on experimental accuracy from a test data set, within some reasonable distance to the camera.
 *** Accuracy within 30 cm (~ one foot) for any visible object in the image :ignore:
+    While having good performance will improve the user experience, accuracy is far more important.
     We expect the accuracy of depth information to be within 30 cm (approximately one foot) of reality for any object visible in the image, provided that the furthest object is as close as the last visible pyramid in the image.
 *** Expected accuracy based on test data set :ignore:
     \\
     Since we don't have ground-truth data for the historical image, we will need to base this estimate on accuracy for a test data set.
-    For the test data set, we can estimate the expected percentage of error for depth estimates provided by this algorithm by comparing to ground truth test data.
+    For the test data set, we can estimate the expected percentage of error for depth estimates provided by this algorithm by comparing it to ground truth test data.
     We will then assume this expected accuracy is probably accurate to our target historical stereogram.
 
 \pagebreak
 * Related Work
-  Our problem is a variant of structure from motion [[[structure from motion]]].
+  Our problem is a variant of structure from motion cite:sfm.
   We have multiple frames, between which some objects have moved relative to the camera.
   What makes our problem unique is that we don't have the intrinsic or extrinsic parameters of the camera, and we only have 2 images to work with.
 
@@ -74,7 +75,7 @@
 
 *** fSpy :ignore:
     \\
-    fSpy is a tool for finding camera focal length [[[ fspy ]]].
+    fSpy is a tool for finding camera focal length cite:&fspy.
 **** I/O :ignore:
      It takes in a user-inputted set of pairs of parallel lines in the image, which should be perpendicular.
      Given enough of these pairs, it is able to determine the focal length.
@@ -85,8 +86,8 @@
 *** Camera calibration technique from Traffic Analysis From Video (Jakub Sochor) :ignore:
     \\
 **** I/O :ignore:
-     The camera calibration system in [[[sochor]]] is built for video frames taken by traffic cameras.
-     Similar to [[[fspy]]] it uses parallel lines to solve for camera parameters.
+     The camera calibration system in cite:sochor is built for video frames taken by traffic cameras.
+     Similar to cite:fspy it uses parallel lines to solve for camera parameters.
      However, it uses motion of cars between frames as one set of parallel lines.
 **** why we can't use it                                             :ignore:
      If our cameras had the same rotation and the only motion between our left and right frames was translation, we might be able to use the same method to extract lines.
@@ -101,14 +102,14 @@
 
 *** OpenMVG :ignore:
     \\
-    One solid choice of library is OpenMVG [[[openmvg]]].
+    One solid choice of library is OpenMVG cite:openmvg.
 **** features :ignore:
      OpenMVG provides tools for multiple view geometry calculations, including methods for structure from motion and PnP (perspective-n-points is a related problem for finding camera pose relative to a camera of known dimensions).
 **** issues :ignore:
      The only issue is that OpenMVG does not provide Python bindings, which means we would need to write our own wrapper in order to use it for this project.
 *** OpenCV :ignore:
     \\
-    OpenCV [[[opencv]]] is a mature general purpose computer vision library.
+    OpenCV cite:opencv is a mature general purpose computer vision library.
 **** features :ignore:
      While OpenCV does not provide many features specifically related to structure from motion, it does provide many of the tools we need to build most of the parts of our pipeline.
      OpenCV also has Python bindings, allowing us to avoid wrapping / distributing native binaries ourselves.
@@ -117,8 +118,8 @@
 *** additional libraries                                             :ignore:
     \\
     In addition to a computer vision library, we will also use a combination of a few math libraries.
-    Numpy [[[numpy]]] provides tools for linear algebra and other mathematical operations.
-    SciPy [[[scipy]]] provides a least-squares optimizer which will be useful for implementing some methods that OpenCV does not provide.
+    Numpy cite:numpy provides tools for linear algebra and other mathematical operations.
+    SciPy cite:scipy provides a least-squares optimizer which will be useful for implementing some methods that OpenCV does not provide.
 
 * Modeling The Problem
   Now that we have a basic understanding of the tools we are working with, we can start analyzing the problem.
@@ -126,15 +127,17 @@
    \\
    We will start by defining a good model for the camera.
 *** pinhole camera model :ignore:
-    [[[camera model notes]]] describes a simplified model of the camera, known as the pinhole camera model.
-    This model is made up of a few important parts.
+    cite:cam_notes describes a simplified model of the camera, known as the pinhole camera model.
+    This model is made up of a few important parts, as shown in [[fig:pinhole]].
 
-    #+CAPTION: Source: [[[camera model notes]]]. Diagram of a pinhole camera.
+    #+CAPTION: Source: cite:cam_notes. Diagram of a pinhole camera.
+    #+NAME: fig:pinhole
+    #+ATTR_LATEX: :placement [H]
     [[file:../data/pinhole.png]]
 
 **** pinhole :ignore:
      \\
-     In a pinhole camera, the light from our scene is directed through an /aperture/ and exposed on the other side.
+     In a pinhole camera, the light from our scene is directed through an $aperture$ and exposed on the other side.
      Optimally, this aperture would be a single point, but in a physical camera this would be impossible.
      In a normal camera, this would be the focal point of the lens, where all the incoming light beams intersect.
      We will use this as the origin of the camera's reference coordinate system.
@@ -145,7 +148,7 @@
      We will call the 2D coordinates mapping the intersection of incoming light beams and the image plane /image space/.
      When we are dealing with a digital image, the units of these coordinates is often measured in pixels.
 
-     The /focal length/ of the camera is the distance from the aperture to this image plane.
+     The $focal length$ of the camera is the distance from the aperture to this image plane.
      It is useful for the focal length to share the units of the image space coordinates, so we will use pixels.
 
 **** optical axis :ignore:
@@ -162,11 +165,12 @@
      These lenses don't necessarily have fixed focal length throughout, possibly due to errors in manufacturing.
      These variations in focal length cause distortion.
      The most common form of distortion is radial distortion, where the focal length of varies as we move away from the center of the lens.
-     Figure [[img:distortion]] shows several examples of radial distortion.
+     [[fig:distortion]] shows several examples of radial distortion.
      If the distortion is significant, we will need to account for it before we can get accurate measurements.
 
-     #+CAPTION: Source [[[camera model notes]]]. Examples of the 2 types of radial distortion, caused by variations in focal length of the lens.
-     #+NAME: img:distortion
+     #+CAPTION: Source cite:cam_notes. Examples of the 2 types of radial distortion, caused by variations in focal length of the lens.
+     #+NAME: fig:distortion
+     #+ATTR_LATEX: :placement [H]
      [[file:../data/distortion.png]]
 
 *** getting from some 3D coordinate system to image space            :ignore:
@@ -176,7 +180,7 @@
 
 **** extrinsic properties / pose :ignore:
      The extrinsic parameters of the camera encode the pose information, including the rotation and translation of the camera in world coordinates.
-     This especially important if you have multiple cameras, like we do in our stereogram setup.
+     This is especially important if you have multiple cameras, like we do in our stereogram setup.
      For instance, we can use the left camera's reference frame as our world coordinates, making the pose of the right camera relative to the first camera.
 **** intrinsic properties / projection :ignore:
      The intrinsic parameters describe the projection from 3D coordinates in our camera's reference system to image space.
@@ -187,16 +191,16 @@
    Now that we have a basic understanding of the camera model, we need a way to represent these transformations using linear operations.
 
 *** homogeneous coordinates :ignore:
-    [[[homogeneous coords notes]]] describes a new coordinate system that we can use to describe the type of transformation we need: homogeneous coordinates.
+    cite:homo_coords_notes describes a new coordinate system that we can use to describe the type of transformation we need: homogeneous coordinates.
      We will focus on the 2D case for the purpose of example, but the ideas represented here can easily be extended to 3D.
 **** basics in 2D [0/2] [0%]                                         :ignore:
      \\
      A point in Cartesian coordinates can be represented as a vector $[x \ y]$, the distance along the coordinate axes from the origin.
      The same point can be written in homogeneous coordinates as a vector $[xZ \ yZ \ Z]$, where $Z$ is a non-zero real number.
-     Z acts as a normalization factor: scaling our entire vector by any non-zero scaling factor will yield the same point, as shown in figure [[eq:norm]].
+     Z acts as a normalization factor: scaling our entire vector by any non-zero scaling factor will yield the same point, as shown in [[fig:eq_norm]].
 
 #+CAPTION: The normalization factor makes points represented in homogeneous coordinates invariant to scale.
-#+NAME: eq:norm
+#+NAME: fig:eq_norm
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -230,10 +234,10 @@
       \\
       Lines are described using the same format as points.
       Given a line described by vector $\lambda = [a \ b \ c]$, and a point described by vector $p = [xZ \ yZ \ Z]$, if $\lambda \cdot p = 0$ the point p is on line \lambda.
-      Figure [[eq:line]] shows how we can find the equation of a line written in homogeneous coordinates.
+      [[fig:eq_line]] shows how we can find the equation of a line written in homogeneous coordinates.
 
 #+CAPTION: The equation of a line from its homogeneous coordinates representation.
-#+NAME: eq:line
+#+NAME: fig:eq_line
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -260,10 +264,10 @@
 
 ****** intersection of lines                                         :ignore:
       The intersection of 2 lines is the cross product.
-      If our lines are parallel, this intersection will be a point at infinity in the direction of the lines, as shown in figure [[eq:para_isect]].
+      If our lines are parallel, this intersection will be a point at infinity in the direction of the lines, as shown in [[fig:eq_para_isect]].
 
 #+CAPTION: The intersection of parallel lines.
-#+NAME: eq:para_isect
+#+NAME: fig:eq_para_isect
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -299,9 +303,9 @@
       As homogeneous coordinates add a normalization factor, these matrices have additional degrees of freedom and can represent more types of transformations.
       The most general form of transformation allowed by homogeneous transformation matrices is projection.
 
-      In figure [[eq:projection]], $A$ is a 2x2 matrix.
+      In [[fig:eq_projection]], $A$ is a 2x2 matrix.
       This matrix can be seen as an affine transformation in Cartesian coordinates, potentially including scaling, rotation, or skew.
-      $t$ can be seen as a translation vector, a fixed value that will be added to each coordinate after the transformation represented by A is applied.
+      $t$ is our translation vector, a fixed value that will be added to each coordinate after the transformation represented by A is applied.
       $s$ is a normalization factor.
       Our vectors will be scaled down by this factor after the other operations have been applied.
       $b$ is a skew vector.
@@ -309,7 +313,7 @@
       Breaking parallelism allows us to project images with non-orthographic perspectives.
 
 #+CAPTION: Breakdown of a projection matrix into a few key components.
-#+NAME: eq:projection
+#+NAME: fig:eq_projection
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -335,13 +339,14 @@
     $K$ maps from 3D directions in our camera's reference space in Cartesian coordinates, to 2D homogeneous coordinates in image space.
     Note that $K$ will not capture any information about the position of our camera in world coordinates, it assumes that the vectors it transforms are from the camera's origin to a point in 3D space.
 
-    The illustration in figure [[fig:projection]] shows how points in 3D are projected to image space.
-    A few similar triangles are present in this image, and we can use these to establish a relationship between the parameters of our camera, the point's coordinates in our camera's reference frame, and the coordinates in image space. Figure [[eq:cart_proj]] shows what this relationship would look like in Cartesian coordinates. We need to divide by /z/ to get the intended result, making this relationship non-linear. However homogeneous coordinates allow us to rewrite this relationship as a linear transformation, as shown in [[eq:homo_proj]].
+    The illustration in [[fig:projection]] shows how points in 3D are projected to image space.
+    A few similar triangles are present in this image, and we can use these to establish a relationship between the parameters of our camera, the point's coordinates in our camera's reference frame, and the coordinates in image space. [[fig:eq_cart_proj]] shows what this relationship would look like in Cartesian coordinates. We need to divide by $z$ to get the intended result, making this relationship non-linear. However homogeneous coordinates allow us to rewrite this relationship as a linear transformation, as shown in [[fig:eq_homo_proj]].
 
-#+CAPTION: Diagram of projection. /O/ is the aperture. /f/ is the focal length of the lens. /P/ is the principal point. /A/ is the point in 3D space, /a/ is the same point on the image plane. $[x \ y \ z]$ specifies the location of /A/ in the camera's reference frame. $[u \ v]$ specifies the location of /a/ in image coordinates.
+#+CAPTION: Diagram of projection. $O$ is the aperture. $f$ is the focal length of the lens. $P$ is the principal point. $A$ is the point in 3D space, $a$ is the same point on the image plane. $[x \ y \ z]$ specifies the location of $A$ in the camera's reference frame. $[u \ v]$ specifies the location of $a$ in image coordinates.
 #+NAME: fig:projection
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
+  \centering
   \begin{tikzpicture}
     \coordinate [label={below right:$O$}] (O) at (0, 0);
     \coordinate [label={below left:$P$}] (P) at (-4.6, 3);
@@ -371,7 +376,7 @@
 #+end_figure
 
 #+CAPTION: Solving for our image coordinates given details about our camera, using Cartesian coordinates. Here the center of the image is $[c_x \ c_y]$.
-#+NAME: eq:cart_proj
+#+NAME: fig:eq_cart_proj
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -399,7 +404,7 @@
 #+end_figure
 
 #+CAPTION: Converting our projection equation to homogeneous coordinates and defining the camera intrinsic matrix K.
-#+NAME: eq:homo_proj
+#+NAME: fig:eq_homo_proj
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -507,7 +512,7 @@
 ***** pose in the general case                                       :ignore:
       \\
       In the general case, this class of problems is known as Perspective-n-Points or PnP.
-      OpenCV provides a number of solutions for this problem, as described in [[[3pnp]]] and [[[epnp]]].
+      OpenCV provides a number of solutions for this problem, as described in cite:3pnp and cite:epnp.
       As input these functions take in a list of 3D points describing features of our object, as well as a list of 2D points specifying the corresponding features in image space.
       In order to generate a unique solution, these functions need at least 4 points.
 
@@ -528,28 +533,29 @@
 
 **** epipolar geometry :ignore:
      \\
-     [[[epipolar notes]]] describes the geometry of a 2 camera setup, or epipolar geometry.
+     cite:epi_notes describes the geometry of a 2 camera setup, or epipolar geometry.
      In a typical stereogram camera setup, the camera centers are separated by a fixed distance.
      The segment between the two cameras' centers is known as the /baseline/.
      The intersection of the baseline with a camera's image plane is known as an /epipole/.
-     If the camera plane and the baseline are parallel, the /epipole/ is a point at infinity, though this is typically not the case.
+     If the camera plane and the baseline are parallel, the $epipole$ is a point at infinity, though this is typically not the case.
 
      For some 3D point $P$ visible in both cameras' images, we can define a few more structures.
-     The /epipolar plane/ is the plane formed by the 2 camera's centers and the point $P$.
+     The $epipolar plane$ is the plane formed by the 2 camera's centers and the point $P$.
      It is important to notice that this plane contains the baseline and the epipoles.
-     The /epipolar line/ is the intersection of the epipolar plane and a camera plane.
+     The $epipolar line$ is the intersection of the epipolar plane and a camera plane.
      For any choice of $P$, this line will still contain the epipoles.
 
 ***** the importance of parallel cameras [0/2] [0%]                  :ignore:
       \\
       If our cameras' image planes are parallel to the baseline, we know the focal length and the baseline, and we have a matching pair of points from each image, we can calculate the depth to that point using a more simple method than triangulation.
-      In figure [[fig:pll_epipolar]], we can see that $\triangle{PLR}$ and $\triangle{PE_LE_R}$ are similar.
-      We can use the similar triangles in the diagram to find b_l (the distance along the baseline between camera L and our point P), as shown in figure [[eq:disparity]].
+      In [[fig:pll_epipolar]], we can see that $\triangle{PLR}$ and $\triangle{PE_LE_R}$ are similar.
+      We can use the similar triangles in the diagram to find b_l (the distance along the baseline between camera L and our point P), as shown in [[fig:eq_disparity]].
 
-#+CAPTION: Diagram of an epipolar setup where both cameras image planes are parallel to the baseline. /L/ and /R/ are the left and right cameras. /P/ is some point visible to both cameras. /b_l/ and /b_r/ are the distance along the baseline to P from camera's /L/ and /R/ respectively. /x_l/ and /x_r/ is the distance along the x-axis of each camera to the projection of /P/. /E_L/ and /E_R/ are the endpoints of the epipolar line intersecting the projection line for P. /f/ is the focal length, and /z/ is the depth.
+#+CAPTION: Diagram of an epipolar setup where both cameras image planes are parallel to the baseline. $L$ and $R$ are the left and right cameras. $P$ is some point visible to both cameras. $b_l$ and $b_r$ are the distance along the baseline to P from camera's $L$ and $R$ respectively. $x_l$ and $x_r$ is the distance along the x-axis of each camera to the projection of $P$. $E_L$ and $E_R$ are the endpoints of the epipolar line intersecting the projection line for P. $f$ is the focal length, and $z$ is the depth.
 #+NAME: fig:pll_epipolar
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
+  \centering
   \begin{tikzpicture}
     \coordinate [label={below left:$L$}] (L) at (0, 0);
     \coordinate [label={below left:$L_f$}] (Lf) at (0, 2);
@@ -591,7 +597,7 @@
 #+end_figure
 
 #+CAPTION: Solving for distance along the baseline.
-#+NAME: eq:disparity
+#+NAME: fig:eq_disparity
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex :file badpngs/bl_from_triangles.png :results file graphics :exports output
       \begin{align}
@@ -607,10 +613,10 @@
 #+end_figure
 
       We can label the value $x_l + x_r$ the disparity $d$.
-      Looking now at similar triangles $\triangle{LL_zP}$ and $\triangle{LL_fE_l}$, we can now solve for the depth $z$, as shown in figure [[eq:depthfromdisp]].
+      Looking now at similar triangles $\triangle{LL_zP}$ and $\triangle{LL_fE_l}$, we can now solve for the depth $z$, as shown in [[fig:eq_depthfromdisp]].
 
 #+CAPTION: Solving for depth from disparity.
-#+NAME: eq:depthfromdisp
+#+NAME: fig:eq_depthfromdisp
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{align}
@@ -619,7 +625,7 @@
   \end{align}
 #+end_figure
 
-      As this math depends on our cameras' image planes being parallel to the baseline, we will need to define a transformation to /rectify/ the images of cameras that don't adhere to this constraint.
+      As this math depends on our cameras' image planes being parallel to the baseline, we will need to define a transformation to $rectify$ the images of cameras that don't adhere to this constraint.
 
 **** TODO estimating external params :ignore:
      If we can find a set of matching points in our images, we can use our points to determine the required transformation to rectify our images.
@@ -647,10 +653,10 @@
       F has a few interesting properties, it only has 8 degrees-of-freedom since its scale doesn't matter, and it has rank 2 since it maps from points to lines.
 
       Without knowledge of our camera's intrinsic parameters, we might still be able to find the fundamental matrix assuming we can find a sufficient number of independent epipolar lines.
-      Given 2 matching points in our images, $p = [u \ v \ 1]$ and $p' = [u' \ v' \ 1]$, figure [[eq:8p]] shows how we can construct a linear constraint.
+      Given 2 matching points in our images, $p = [u \ v \ 1]$ and $p' = [u' \ v' \ 1]$, [[fig:eq_8p]] shows how we can construct a linear constraint.
 
 #+CAPTION: Constructing a linear constraint on the fundamental matrix from a matching pair of features.
-#+NAME: eq:8p
+#+NAME: fig:eq_8p
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
       \begin{align*}
@@ -697,10 +703,10 @@
 
       With more matches we can build up a matrix $W$ from row vectors $w_i$, such that $Wf=0$.
       We only need 8 matching points to fully define F (since it only has 8 degrees of freedom), but we can use more to deal with potential noise in our matches, finding F with the smallest mean squared error.
-      Our resulting estimate for F might have rank 3, while the real F has rank 2, but we can fix this using SVD, as shown in figure [[eq:8psvd]].
+      Our resulting estimate for F might have rank 3, while the real F has rank 2, but we can fix this using SVD, as shown in [[fig:eq_8psvd]].
 
 #+CAPTION: Correcting the rank of our estimate for the fundamental matrix using SVD.
-#+NAME: eq:8psvd
+#+NAME: fig:eq_8psvd
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -734,13 +740,13 @@
       \\
       Given the camera intrinsic matrix, $K$, we can recover the essential matrix using our estimate of the fundamental matrix.
       Alternatively, we can use a similar algorithm, the 5 point algorithm, to solve for the essential matrix directly.
-      Once we have the essential matrix, [[[recover pose]]] describes a method we can use to recover the pose information of our cameras.
+      Once we have the essential matrix, cite:recover_pose describes a method we can use to recover the pose information of our cameras.
 
 ***** triangulation :ignore:
 
 ***** doing a better job with bundle adjustment :ignore:
       \\
-      After we have estimates for our camera's parameters, we can refine them using a process known as bundle adjustment [[[bundle adjustment]]].
+      After we have estimates for our camera's parameters, we can refine them using a process known as bundle adjustment cite:bundle_adj.
       This process uses the parameters for each camera to triangulate our matched points, and then reproject them back to image space.
       The sum of distances between the reprojected points and the actual points is known as reprojection error.
       We can then use a least squares minimizer to minimize this reprojection error.
@@ -751,7 +757,7 @@
 **** rectification :ignore:
      \\
      Now that we have camera parameters we can create a transformation to align our image planes with the baseline.
-     [[[rectification]]] describes a method for computing this transformation from the fundamental matrix.
+     cite:rectification describes a method for computing this transformation from the fundamental matrix.
      This algorithm breaks down the transformation into 3 component parts: projection, similarity, and shearing.
      The goal of the projection transform is to move the epipoles to a point at infinity.
      The goal of the similarity transform is to rotate the epipoles so they are aligned with the x-axis.
@@ -788,10 +794,10 @@
       The user needs find the vanishing points corresponding to 3 pair-wise perpendicular directions.
       They can do this by marking sets of parallel lines on the scene.
       fSpy uses these lines to calculate the vanishing points.
-      The dot product of the directions of each pair of vanishing points should be zero, as they are perpendicular, as shown in figure [[eq:perp_vanish]].
+      The dot product of the directions of each pair of vanishing points should be zero, as they are perpendicular, as shown in [[fig:eq_perp_vanish]].
 
 #+CAPTION: Constructing a linear constraint on K from perpendicular vanishing points.
-#+NAME: eq:perp_vanish
+#+NAME: fig:eq_perp_vanish
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
   \begin{center}
@@ -804,17 +810,17 @@
 
       These constraints form a system of linear equations, where our coefficients are the coordinates of the vanishing points, and our unknowns are the parts of the camera intrinsic matrix.
       Note that these constraints form a linear constraint not on $K$, but on $(KK^T)^{-1}$.
-      This is fine, however, as we can use Cholesky decomposition to recover $K$ from this value, according to [[[camera model notes]]].
+      This is fine, however, as we can use Cholesky decomposition to recover $K$ from this value, according to cite:cam_notes.
 
       With 3 points we get 3 equations, but the camera intrinsic matrix can have up to 5 unknowns including the 2 focal length values, the principal point, and skew parameter.
       By assuming our image has zero skew and square pixels, we can reduce the number of unknowns to 3.
 
 **** traffic analysis :ignore:
      \\
-     The calibration technique in [[[sochor]]] works similarly to fSpy.
+     The calibration technique in cite:sochor works similarly to fSpy.
 ***** diamond space :ignore:
-      Unlike fSpy, [[[sochor]]] works with more than 2 lines for each vanishing point.
-      In order to find the closest point to a set of lines, they use a special dual space known as /Diamond Space/ [[[diamond space]]].
+      Unlike fSpy, cite:sochor works with more than 2 lines for each vanishing point.
+      In order to find the closest point to a set of lines, they use a special dual space known as $Diamond Space$ cite:diamond_space.
       This dual space simplifies the process of finding the most likely vanishing point, and makes it simpler to group lines into perpendicular groups.
 ***** first vanishing point :ignore:
      For the first vanishing point, they assume their video frames will have cars moving in parallel lines, following the lanes.
@@ -847,11 +853,11 @@
 **** TODO ORB, AKAZE, SIFT, BruteForceMatcher
 **** findEssentialMat :ignore:
      \\
-     /findEssentialMat()/ estimates the essential matrix using the 5 point algorithm.
+     ~findEssentialMat()~ estimates the essential matrix using the 5 point algorithm.
      It requires us to have some initial guess for our camera's intrinsic parameters, including the focal length and the principal point.
 
      In the presence of outliers in our match info, the 5 point algorithm might generate an inaccurate estimate.
-     To deal with this, OpenCV can use one of 2 methods to filter the input points: /RANSAC/ or /LMEDS/.
+     To deal with this, OpenCV can use one of 2 methods to filter the input points: $RANSAC$ or $LMEDS$.
      LMEDS, or least medians, attempts to find the essential matrix minimizing the median of error for all matches.
      The median is less susceptible to outliers than the mean, and is overall a better representation of the center of the population of our points.
      RANSAC is a general method for filtering noisy inputs when optimizing linear functions.
@@ -860,30 +866,30 @@
 
 **** recoverPose :ignore:
      \\
-     /recoverPose()/ takes in an essential matrix and breaks it down into it's component pose information.
+     ~recoverPose()~ takes in an essential matrix and breaks it down into it's component pose information.
      It outputs a rotation matrix and a translation vector.
      The pose corresponding to a particular essential matrix is not unique, and there can be up to 4 different combinations.
-     /recoverPose()/ takes in our set of matching points and uses the pose estimate to triangulate their locations.
+     ~recoverPose()~ takes in our set of matching points and uses the pose estimate to triangulate their locations.
      It then finds the pose in which most of the points are triangulated to be in front of the camera.
 
 **** bundle adjustment :ignore:
      \\
      OpenCV does not provide a method for bundle adjustment, but it does provide several methods for us to implement bundle adjustment ourselves.
      Typically bundle adjustment uses reprojection error as the cost function, minimizing the difference between re-projected triangulated points and the corresponding points in each image.
-     The initial guess for the best possible triangulated points can be found using /triangulatePoints()/ a function that takes in each of our camera's intrinsic matrix and the essential matrix and outputs the triangulated points.
-     This function does not account for distortion, so we will need to call /undistortPoints()/ with our guess for the distortion parameters before we call this function.
+     The initial guess for the best possible triangulated points can be found using ~triangulatePoints()~ a function that takes in each of our camera's intrinsic matrix and the essential matrix and outputs the triangulated points.
+     This function does not account for distortion, so we will need to call ~undistortPoints()~ with our guess for the distortion parameters before we call this function.
 
-     To reproject these points back to image space, we can use /projectPoints()/ which takes in our camera's parameters and outputs the projected points.
+     To reproject these points back to image space, we can use ~projectPoints()~ which takes in our camera's parameters and outputs the projected points.
      Bundle adjustment also requires us to be able to calculate the Jacobian of our cost function, and we could calculate it directly if OpenCV provided a Jacobian for /projectPoints()/.
-     Unfortunately while /projectPoints()/ does output a Jacobian, it does not include the partial derivatives relative to the input set of points, which we would need.
+     Unfortunately while ~projectPoints()~ does output a Jacobian, it does not include the partial derivatives relative to the input set of points, which we would need.
      Therefore, in order to obtain the Jacobian we will need to estimate using the finite difference method.
 
-     We might also consider using an alternative cost function instead of reprojection error, such as the one described in [[[altbundle]]].
+     We might also consider using an alternative cost function instead of reprojection error, such as the one described in cite:altbundle.
      This function use our camera intrinsic matrix and pose information to lines in world coordinates.
      The error is then the minimum distance between these lines.
      This avoids triangulating our points and then reprojecting them, but still finds a similar cost.
 
-     For the actual bundle adjustment implementation, we need a least square minimizer such as the popular Levenberg-Marquardt algorithm [[[lm]]].
+     For the actual bundle adjustment implementation, we need a least square minimizer such as the popular Levenberg-Marquardt algorithm cite:lm.
      Fortunately, SciPy offers a Python implementation: /scipy.optimize.least\under{}squares/.
      This function can also optionally approximate the Jacobian use the finite difference method for us.
      It might be useful to consider calculating the Jacobian directly for improved accuracy.
@@ -891,39 +897,39 @@
 **** stereoRectify :ignore:
      \\
      After we have an accurate estimate for the pose of our camera's we would need to generate a rectification transform.
-     /stereoRectify()/ takes in our camera's parameters and outputs this transformation for each of our cameras.
-     After we have the transformations, we can actually perform the rectification using /warpPerspective()/ a function that transforms an image using a projection matrix.
+     ~stereoRectify()~ takes in our camera's parameters and outputs this transformation for each of our cameras.
+     After we have the transformations, we can actually perform the rectification using ~warpPerspective()~ a function that transforms an image using a projection matrix.
 
 **** StereoSGBM :ignore:
      \\
-     /StereoSGBM/ implements the semi-global block matching algorithm.
-     In addition to the input stereogram, /StereoSGBM/ also includes several hyperparameters we can fine-tune to get a better output disparity map.
-     The function of each parameters is described in [[[sgbm]]].
-     The parameter /numDisparites/ controls the size of the sliding window, i.e. how far to look to the left for a match for each block.
-     The /speckleWindow/, /minDisparity/, and /speckleRange/ parameters control the process that filters out speckles.
-     /Speckle/ is a type of error that can occur along the edge of objects when the sliding window includes foreground and background elements.
+     ~StereoSGBM~ implements the semi-global block matching algorithm.
+     In addition to the input stereogram, ~StereoSGBM~ also includes several hyperparameters we can fine-tune to get a better output disparity map.
+     The function of each parameters is described in cite:sgbm.
+     The parameter ~numDisparites~ controls the size of the sliding window, i.e. how far to look to the left for a match for each block.
+     The ~speckleWindow~, ~minDisparity~, and ~speckleRange~ parameters control the process that filters out speckles.
+     $Speckle$ is a type of error that can occur along the edge of objects when the sliding window includes foreground and background elements.
      The process discards matches for pixels where the minimum disparity in the window specified is less than the minimum.
-     Finally, the smoothing parameters /P1/ and /P2/ control how smooth the outputted disparity map should be.
+     Finally, the smoothing parameters ~P1~ and ~P2~ control how smooth the outputted disparity map should be.
      This can help fill in holes in the disparity map, at the cost of accuracy.
 
 **** Depth Completion via ml :ignore:
 
-     As an alternative to generating disparity information for each pixel in our image using a block matcher, [[[depth completion]]] uses a neural network to extend sparse depth information.
+     As an alternative to generating disparity information for each pixel in our image using a block matcher, cite:depth_compl uses a neural network to extend sparse depth information.
      This method would use the depth from our triangulated points, as well as the image data in order to predict the depth data for the rest of the image.
      The primary advantage of this solution is that it doesn't rely on finding matches in sparsely textured areas in order to determine depth, potentially resulting in less areas of high inaccuracy.
 
  \pagebreak
 * Our Pipeline
   Now that we understand all the tools at our disposal, we can use them to construct a solution.
-  Figure [[fig:pipeline]] breaks our pipeline down into several concrete steps, each building on the input generated from the last until we have our desired output.
+  [[fig:pipeline]] breaks our pipeline down into several concrete steps, each building on the input generated from the last until we have our desired output.
 
 #+CAPTION: Our depth estimation pipeline.
 #+NAME: fig:pipeline
 #+ATTR_LATEX: :options [H]
 #+begin_figure latex
-
+\centering
 \begin{tikzpicture}[
-  block/.style={rectangle, draw=black, semithick, align=left, minimum height=2em, minimum width=50ex},
+  block/.style={rectangle, draw=black, semithick, align=left, minimum height=2em, minimum width=30ex},
   obj/.style={rounded rectangle, draw=black, fill=black!20, semithick, align=left, minimum width=13em, minimum height=2em}
 ]
 
@@ -936,7 +942,7 @@
 \node[block] (depth) [below=of disparity] {Calculate Depth};
 \node[block] (scale) [below=of depth] {Readjust Scale};
 
-\node[obj] (focal) [above=4em of normal.west, anchor=west] {Focal Length Prediction};
+\node[obj] (focal) [above=8em of normal.west, anchor=west] {Focal Length Prediction};
 \node[obj] (stereo) [above=4em of normal.east, anchor=east] {Stereogram Frames};
 \node[obj] (ground) [right=of scale] {Ground Truth Scale Information};
 \node[obj] (out) [below=of scale] {Output Depth Map};
@@ -969,7 +975,7 @@
    We start by using one of OpenCV's feature detectors on each of our image frames.
    We will likely use either ORB or AKAZE as they are fast, produce many features, and the feature vectors are invariant under rotation.
    After we have 2 sets of features, we can use a brute force matcher to find the top 2 matches for each point in the left image to points in the right image.
-   We then apply the ratio test described in [[[ratio]]] to filter out points where the first best match is not unambiguously the best.
+   We then apply the ratio test described in cite:ratio to filter out points where the first best match is not unambiguously the best.
    The output of this phase is an $n \times 2 \times 2$ tensor of points, where $n$ is the number of points.
    The second dimension selects between our 2 images, and the last dimension selects the $x$ or $y$ coordinate.
 
@@ -977,7 +983,7 @@
 
 ** Initial Pose Estimation
    Once we have our matching points, we can use them to estimate the pose of our stereo setup.
-   To do this we will use /findEssentialMat()/ passing it our set of matches from the previous step and our initial estimates for the camera parameters.
+   To do this we will use ~findEssentialMat()~ passing it our set of matches from the previous step and our initial estimates for the camera parameters.
    The focal length will come from the focal length predictor, and we will assume initially our image has no distortion or skew, and that the principal point is just the center of the image.
    While this initial estimate will most likely be inaccurate due to inaccuracy in these assumptions, our goal is just to get a good starting point for bundle adjustment to start optimizing.
    The output of this phase is the essential matrix, encoding the rotation and translation of our second camera relative to the first.
@@ -985,22 +991,22 @@
 ** Pose and Camera Parameter Refinement
    Now that we have initial guesses for both of our camera's intrinsic and extrinsic parameters, we can use bundle adjustment to hopefully improve their accuracy.
    The output of the previous step was the essential matrix,so we will need to first decompose it into a rotation matrix and translation vector before we can actually use it, using /recoverPose()/.
-   Once we have all of our input parameters in a usable format, we can define our cost function, based on [[[altbundle]]].
-   After that we can pass our cost function to /scipy.optimize.least\under{}squares()/.
+   Once we have all of our input parameters in a usable format, we can define our cost function, based on cite:altbundle.
+   After that we can pass our cost function to ~scipy.optimize.least_squares()~.
    This will use the Levenberg-Marquardt minimizer, determining the Jacobian using the finite difference method.
    The output of this function will be our refined camera parameters, including predicted distortion.
 
 ** Image Rectification
    After we retrieve our refined pose from the previous step, we can use it to rectify our images.
-   Before we apply a rectification transformation, we can use the distortion values found by bundle adjustment to call /undistort()/ on our input images.
+   Before we apply a rectification transformation, we can use the distortion values found by bundle adjustment to call ~undistort()~ on our input images.
    Next we can pass our camera parameters to /stereoRectify()/.
    This function will generate a good rectification transformation for us, preserving the aspect ratio of our images.
    The output of this step will be our newly rectified images.
 
 ** Stereo Block Matching
-   Now that our images our rectified, we can use the /StereoSGBM/ algorithm to generate a disparity map for our image.
+   Now that our images our rectified, we can use the ~StereoSGBM~ algorithm to generate a disparity map for our image.
    We can fine tune some of the parameters based on the matches we generated in the feature matching step.
-   For instance, the value of /minDisparities/ and /numDisparities/ can be set based on the distribution of lengths between matching points.
+   For instance, the value of ~minDisparities~ and ~numDisparities~ can be set based on the distribution of lengths between matching points.
    Other parameters will likely need to be set based on the image scale or other properties we might be unable to automate, so some user input may be necessary in this step.
    The output of this step will be a disparity map that we can use to compute depth.
    
@@ -1013,34 +1019,70 @@
    After we display the depth map to the user, they can provide ground truth length data by marking a line in the image and indicating it's length.
    The depth map will need to be rescaled based on the ratio of the real length to our estimate.
    
-* TODO Testing
+* Testing
+** Datasets
+   In order to benchmark our pipeline, we first need a datset.
+   
+*** Tsukuba :ignore:
+    One option is the New Tsukuba Dataset cite:tsukuba.
+    Tsukuba is a popular stereo test dataset consisting of 1800 frames of stereo video, developed by the University of Tsukuba.
+    This video is rendered from a 3D scene, based on a similar scene in a previous dataset.
+    The fact that this dataset is simulated means that it does not have noisy images or validation data.
+    This is not necessarily representative of our target stereogram, where there is plenty of noise.
+    Additionally, the stereo camera setup is already rectified, therefore we cannot use it to test our pose estimation.
+    There is also no distortion, and all the video frames come from a single scene with similar structure throughout.
+    Due to all of these factors, Tsukuba is a good sanity check dataset, but using it as a benchmark to predict our performance on our target image is probably a bad idea.
+    
+*** kitti :ignore:
+    \\
+    Another popular option is the KITTI dataset cite:kitti.
+    Unlike Tsukuba's dataset, the data here was generated while testing autonomous vehicles in the real world.
+    The sensor data was taken in a variety of different road environments.
+    This ranges from more urban streets with several visible people and buildings, to quieter rural areas with trees and more complex terrain.
+    This means that the images have the potential for noise and distortion, but this comes at the cost of accuracy for our ground truth data.
+    The ground truth data for KITTI was generated by a few other sensors onboard the autonomous vehicle platform.
+    This includes a LIDAR sensor to generate depth data, as well as an accelerometer to determine changes in the vehicles position.
+    The camera's will need to be rectified and undistorted, but the camera parameters are likely to be relatively stable throughout the dataset.
+    This makes it a good sanity check for our pose estimation, but not a good benchmark in this regard.
+    Overall, KITTI is a lot more well rounded then Tsukuba, but might not get us a good idea of how our solution will behave in situations with strange camera pose or distortion.
+    
+*** making our own :ignore:
+    \\
+    If we need to, we might even be able to build our own dataset to benchmark our pipeline.
+    This will probably need to be simulated due to resource constraints.
+    However, we can vary camera parameters in ways that the other datasets do not.
+    We can also generate noise to see how our model behaves in that situation as well.
+    This simulation would depend on having a scriptable render pipeline.
+    3D modeling programs like blender could allow us to render the data we need, but it will likely involve a lot of wok developing the tools to do so.
+   
+** Benchmarks
+   Regardless of what dataset we choose, we will need to have a metric to compare our results to the validation data and estimate our accuracy.
+   KITTI's strategy involves checking each pixel against the validation data, and counting the number of pixels in our disparity map within 3% error.
+   We can tune this paramter based on the kind of performance we would want from our solution.
+   In our case, we want the model to be accurate to the last visible pyramid within 30cm, so once we have that measurement it will be fairly straightforward to set an error threshold.
+  
 * Conclusions
-** TODO review our design
-** why we will meet our AC
-*** our pipeline accounts for possible error in our input sources 
-*** our tests allow us to tune our hyperparameters
+** review our design :ignore:
+   \\
+   Our 
+   our design takes in the inputs and builds our outputs
+   each step in the pipeline constructs new structures we can use in later stages, or refines the results of previous steps
+   by building off of an existing mature computer vision library, we can rapidly prototype and tune the different parts of the pipeline.
+   our pipeline exposes a few hyperparameters that we will need to tune, such as the smoothing parameters of the block matcher.
+   there is probably not one set of hyperparameters maximizing performance for all scenes, but we have the flexibility to choose ones that maximize our accuracy in our target scene.
+   
+** why we will meet our AC :ignore:
+*** our pipeline accounts for possible error in our input sources :ignore:
+    \\
+    By normalizing our images we can reduce the amount of noise present due to image grain.
+    Error in our feature matchers resulting from untextured or image noise can be filtered out using techniques such as LMEDS.
+    Our pose estimate is further refined using bundle adjustment.
+    Our final depth output is smoothed to avoid holes.
+    
+*** our tests allow us to tune our hyperparameters :ignore:
+    \\
+    by running benchmarks, we can keep track of how changing certain hyperparameters effects our solution's behavior.
+    from this information, we can attempt to tune our parameters to increase the potential accuracy of our target scene.
+    while we don't have ground truth image data for our actual target, we can still make sure our depth output is sane for geometry we have dimensions for (e.g. the pyramids)
 
-* Sources
-  1. <<fspy>> https://fspy.io/basics/
-  2. <<sochor>> http://www.itspy.cz/wp-content/uploads/2014/11/acmspy2014_submission_25.pdf#page=64&zoom=100,130,908
-  3. <<openmvg>> http://imagine.enpc.fr/~moulonp/openMVG/
-  4. <<opencv>> https://opencv.org/
-  5. <<numpy>> https://numpy.org/
-  6. <<scipy>> https://scipy.org/
-  7. <<camera model notes>> https://web.stanford.edu/class/cs231a/course_notes/01-camera-models.pdf
-  8. <<homogeneous coords notes>> https://web.stanford.edu/class/cs231a/course_notes/02-single-view-metrology.pdf
-  9. <<epipolar notes>> https://web.stanford.edu/class/cs231a/course_notes/03-epipolar-geometry.pdf
-  10. <<epnp>> Vincent Lepetit, Francesc Moreno-Noguer, and Pascal Fua. Epnp: An accurate o (n) solution to the pnp problem. International journal of computer vision, 81(2):155–166, 2009.
-  11. <<3pnp>> Xiao-Shan Gao, Xiao-Rong Hou, Jianliang Tang, and Hang-Fei Cheng. Complete solution classification for the perspective-three-point problem. Pattern Analysis and Machine Intelligence, IEEE Transactions on, 25(8):930–943, 2003.
-  12. <<recover pose>> https://www.uio.no/studier/emner/matnat/its/nedlagte-emner/UNIK4690/v16/forelesninger/lecture_7_3-pose-from-epipolar-geometry.pdf
-  13. <<bundle adjustment>> http://lear.inrialpes.fr/pubs/2000/TMHF00/Triggs-va99.pdf
-  14. <<rectification>> http://dev.ipol.im/~morel/Dossier_MVA_2011_Cours_Transparents_Documents/2011_Cours7_Document2_Loop-Zhang-CVPR1999.pdf
-  15. <<diamond space>> http://www.fit.vutbr.cz/research/groups/graph/pclines/papers/2013-BMVC-Dubska-VanishingPointsDetection.pdf
-  16. <<structure from motion>> https://www.mathworks.com/help/vision/ug/structure-from-motion.html
-  17. <<loc>> https://www.loc.gov/pictures/item/2018671309/
-  18. <<sgbm>> https://ww2.mathworks.cn/help/visionhdl/ug/stereoscopic-disparity.html
-  19. <<lm>> J. J. More, “The Levenberg-Marquardt Algorithm: Implementation and Theory,” Numerical Analysis, ed. G. A. Watson, Lecture Notes in Mathematics 630, Springer Verlag, pp. 105-116, 1977.
-  20. <<altbundle>> https://www.asprs.org/a/publications/proceedings/baltimore09/0110.pdf
-  21. <<depth completion>> https://arxiv.org/pdf/2108.10531.pdf
-  22. <<ratio>> https://www.cs.ubc.ca/~lowe/papers/ijcv04.pdf
-      
+     bibliography:references.bib
